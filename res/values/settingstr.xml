@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="setting_time_choice_values">
+        <item >0</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+    </string-array>
+    <string-array name="setting_time_choice_human">
+        <item >No time</item>
+        <item>Event start time</item>
+        <item>Event end time</item>
+        <item>Start and end time (00:00-01:00)</item>
+        <item>Dynamically (changes on event begin)</item>
+    </string-array>
+    <string-array name="setting_text_choice_values">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+    <string-array name="setting_text_choice_human">
+        <item >No text</item>
+        <item>Event title</item>
+        <item>Event location</item>
+    </string-array>
+    <string-array name="setting_font_size_choice_values">
+        <item >0</item>
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+    <string-array name="setting_font_size_choice_human">
+        <item >Small</item>
+        <item >Medium</item>
+        <item >Large</item>
+    </string-array>
+    
+</resources>
