@@ -13,6 +13,7 @@ import android.net.Uri;
 import android.preference.PreferenceManager;
 import android.provider.CalendarContract.Calendars;
 import android.provider.CalendarContract.Instances;
+import android.util.Log;
 
 public class CalendarReader {
 	/**
@@ -22,10 +23,10 @@ public class CalendarReader {
 	 */
 	public static ArrayList<CalendarEvent> getEvents(Context context, int maxNum) {
 		ArrayList<CalendarEvent> events = new ArrayList<CalendarEvent>();
-
+		
 		// Specify the date range for searching events
 		Calendar beginTime = Calendar.getInstance();
-		beginTime.roll(Calendar.DAY_OF_MONTH, -1);
+		beginTime.add(Calendar.DAY_OF_MONTH, -1);
 		beginTime.set(Calendar.HOUR_OF_DAY, 23);
 		beginTime.set(Calendar.MINUTE, 59);
 		long startMillis = beginTime.getTimeInMillis();
@@ -33,7 +34,7 @@ public class CalendarReader {
 		Calendar endTime = Calendar.getInstance();
 		endTime.set(Calendar.HOUR_OF_DAY, 23);
 		endTime.set(Calendar.MINUTE, 59);
-		endTime.roll(Calendar.DAY_OF_MONTH, 6);
+		endTime.add(Calendar.DAY_OF_MONTH, 6);
 		long endMillis = endTime.getTimeInMillis();
 
 		Cursor cur = null;
@@ -45,7 +46,7 @@ public class CalendarReader {
 		Uri.Builder builder = Instances.CONTENT_URI.buildUpon();
 		ContentUris.appendId(builder, startMillis);
 		ContentUris.appendId(builder, endMillis);
-
+		
 		// Submit the query
 		cur = cr.query(builder.build(), new String[] { Instances.CALENDAR_ID, Instances.EVENT_ID, Instances.EVENT_LOCATION, Instances.BEGIN, Instances.END, Instances.TITLE, Instances.ALL_DAY }, selection, selectionArgs,
 				Instances.BEGIN + " ASC");

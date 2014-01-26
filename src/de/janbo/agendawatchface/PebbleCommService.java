@@ -28,7 +28,7 @@ import android.util.Log;
  */
 public class PebbleCommService extends Service {
 	public static final UUID PEBBLE_APP_UUID = UUID.fromString("1f366804-f1d2-4288-b71a-708661777887");
-	public static final byte CURRENT_WATCHAPP_VERSION_BUNDLED = 2; //expected watchapp version. If watch reports different, prompt the user to update
+	public static final byte CURRENT_WATCHAPP_VERSION_BUNDLED = 3; //expected watchapp version. If watch reports different, prompt the user to update
 
 	public static final int MAX_NUM_EVENTS_TO_SEND = 10; //should correspond to number of items saved in the watch database
 
@@ -213,6 +213,8 @@ public class PebbleCommService extends Service {
 		flags |= prefs.getBoolean("pref_layout_ad_show_row2", false) ? 0x10 : 0;
 		flags |= Integer.parseInt(prefs.getString("pref_layout_font_size", "0"))%2 == 1 ? 0x20 : 0;
 		flags |= Integer.parseInt(prefs.getString("pref_layout_font_size", "0")) > 1 ? 0x40 : 0;
+		flags |= Integer.parseInt(prefs.getString("pref_header_time_size", "0"))%2 == 1 ? 0x80 : 0;
+		flags |= Integer.parseInt(prefs.getString("pref_header_time_size", "0")) > 1 ? 0x100 : 0;
 
 		dict.addUint32(PEBBLE_KEY_SETTINGS_BOOLFLAGS, flags);
 		
@@ -247,6 +249,7 @@ public class PebbleCommService extends Service {
 	 * @param numberOfEvents
 	 */
 	private void sendInitDataMsg(int numberOfEvents) {
+		Log.d("PebbleCommunication", "sending init message, advertising "+numberOfEvents+" events");
 		PebbleDictionary data = new PebbleDictionary();
 		data.addUint8(PEBBLE_KEY_COMMAND, PEBBLE_COMMAND_INIT_DATA); //command
 		data.addUint8(PEBBLE_KEY_NUM_EVENTS, (byte) numberOfEvents); //number of events we will send

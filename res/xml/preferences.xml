@@ -2,7 +2,7 @@
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android" >
     <PreferenceScreen android:persistent="false" android:summary="Choose which calendars to display" android:title="Pick calendars" android:key="pref_screen_cal_pick"></PreferenceScreen><CheckBoxPreference android:summaryOn="Showing all-day events" android:defaultValue="true" android:title="Show all-day events" android:key="pref_show_all_day_events" android:summaryOff="Hiding all-day events"/>
     <PreferenceCategory android:title="Design">
-        <CheckBoxPreference android:summaryOff="Hiding header with current time and date" android:key="pref_show_header" android:title="Show header" android:summaryOn="Showing header with current time and date" android:defaultValue="true"/><ListPreference android:key="pref_layout_font_size" android:entryValues="@array/setting_font_size_choice_values" android:title="Font size for events" android:entries="@array/setting_font_size_choice_human" android:defaultValue="0"/>
+        <CheckBoxPreference android:summaryOff="Hiding header with current time and date" android:key="pref_show_header" android:title="Show header" android:summaryOn="Showing header with current time and date" android:defaultValue="true" android:disableDependentsState="false"/><ListPreference android:title="Size of time in header" android:key="pref_header_time_size" android:dependency="pref_show_header" android:entryValues="@array/setting_header_size_choice_values" android:entries="@array/setting_header_size_choice_human" android:defaultValue="0"/><ListPreference android:key="pref_layout_font_size" android:entryValues="@array/setting_font_size_choice_values" android:title="Font size for events" android:entries="@array/setting_font_size_choice_human" android:defaultValue="0"/>
         <PreferenceScreen android:key="pref_screen_event_layout" android:title="Choose event layout">
             
             <PreferenceCategory android:title="First line">
@@ -26,6 +26,7 @@
             </PreferenceCategory>
         </PreferenceScreen>
     <CheckBoxPreference android:summaryOn="Showing times in 12h format" android:title="12h time" android:key="pref_12h" android:summaryOff="Showing times in 24h format" android:defaultValue="false" android:disableDependentsState="false" /><CheckBoxPreference android:dependency="pref_12h" android:title="Show am/pm" android:key="pref_ampm" android:defaultValue="true" android:summaryOn="Appending am or pm to times" android:summaryOff="Not appending am or pm" />
+    
     
 </PreferenceCategory>
     

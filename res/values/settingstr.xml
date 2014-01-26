@@ -34,5 +34,13 @@
         <item >Medium</item>
         <item >Large</item>
     </string-array>
+    <string-array name="setting_header_size_choice_values">
+        <item >0</item>
+        <item>1</item>
+    </string-array>
+    <string-array name="setting_header_size_choice_human">
+        <item >Default</item>
+        <item >Large</item>
+    </string-array>
     
 </resources>
