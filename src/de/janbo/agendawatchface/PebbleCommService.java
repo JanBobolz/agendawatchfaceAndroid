@@ -28,7 +28,7 @@ import android.util.Log;
  */
 public class PebbleCommService extends Service {
 	public static final UUID PEBBLE_APP_UUID = UUID.fromString("1f366804-f1d2-4288-b71a-708661777887");
-	public static final byte CURRENT_WATCHAPP_VERSION_BUNDLED = 3; //expected watchapp version. If watch reports different, prompt the user to update
+	public static final byte CURRENT_WATCHAPP_VERSION_BUNDLED = 4; //expected watchapp version. If watch reports different, prompt the user to update
 
 	public static final int MAX_NUM_EVENTS_TO_SEND = 10; //should correspond to number of items saved in the watch database
 
@@ -215,6 +215,7 @@ public class PebbleCommService extends Service {
 		flags |= Integer.parseInt(prefs.getString("pref_layout_font_size", "0")) > 1 ? 0x40 : 0;
 		flags |= Integer.parseInt(prefs.getString("pref_header_time_size", "0"))%2 == 1 ? 0x80 : 0;
 		flags |= Integer.parseInt(prefs.getString("pref_header_time_size", "0")) > 1 ? 0x100 : 0;
+		flags |= prefs.getBoolean("pref_separator_date", false) ? 0x200 : 0;
 
 		dict.addUint32(PEBBLE_KEY_SETTINGS_BOOLFLAGS, flags);
 		

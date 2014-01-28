@@ -1,32 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android" >
     <PreferenceScreen android:persistent="false" android:summary="Choose which calendars to display" android:title="Pick calendars" android:key="pref_screen_cal_pick"></PreferenceScreen><CheckBoxPreference android:summaryOn="Showing all-day events" android:defaultValue="true" android:title="Show all-day events" android:key="pref_show_all_day_events" android:summaryOff="Hiding all-day events"/>
-    <PreferenceCategory android:title="Design">
-        <CheckBoxPreference android:summaryOff="Hiding header with current time and date" android:key="pref_show_header" android:title="Show header" android:summaryOn="Showing header with current time and date" android:defaultValue="true" android:disableDependentsState="false"/><ListPreference android:title="Size of time in header" android:key="pref_header_time_size" android:dependency="pref_show_header" android:entryValues="@array/setting_header_size_choice_values" android:entries="@array/setting_header_size_choice_human" android:defaultValue="0"/><ListPreference android:key="pref_layout_font_size" android:entryValues="@array/setting_font_size_choice_values" android:title="Font size for events" android:entries="@array/setting_font_size_choice_human" android:defaultValue="0"/>
-        <PreferenceScreen android:key="pref_screen_event_layout" android:title="Choose event layout">
+    <PreferenceCategory android:title="Header">
+        <CheckBoxPreference android:summaryOff="Hiding header with current time and date" android:key="pref_show_header" android:title="Show header" android:summaryOn="Showing header with current time and date" android:defaultValue="true" android:disableDependentsState="false"/><ListPreference android:title="Size of time in header" android:key="pref_header_time_size" android:dependency="pref_show_header" android:entryValues="@array/setting_header_size_choice_values" android:entries="@array/setting_header_size_choice_human" android:defaultValue="0"/>
+        
+        
+    
+    
+    
+</PreferenceCategory>
+    <PreferenceCategory android:title="Event layout"><ListPreference android:key="pref_layout_font_size" android:entryValues="@array/setting_font_size_choice_values" android:title="Font size for events" android:entries="@array/setting_font_size_choice_human" android:defaultValue="0" /><PreferenceScreen android:key="pref_screen_event_layout" android:title="Regular event layout">
             
             <PreferenceCategory android:title="First line">
                 
-            <ListPreference android:title="Time to show" android:key="pref_layout_time_1" android:entryValues="@array/setting_time_choice_values" android:entries="@array/setting_time_choice_human" android:summary="Choose what time to display" android:defaultValue="0"/>
-            <ListPreference android:key="pref_layout_text_1" android:title="Text to show" android:entryValues="@array/setting_text_choice_values" android:entries="@array/setting_text_choice_human" android:summary="Choose what text to display" android:defaultValue="1"/>
+            <ListPreference android:title="Time to show" android:key="pref_layout_time_1" android:entryValues="@array/setting_time_choice_values" android:entries="@array/setting_time_choice_human" android:summary="Choose what time to display" android:defaultValue="0" />
+            <ListPreference android:key="pref_layout_text_1" android:title="Text to show" android:entryValues="@array/setting_text_choice_values" android:entries="@array/setting_text_choice_human" android:summary="Choose what text to display" android:defaultValue="1" />
             </PreferenceCategory>
             <PreferenceCategory android:title="Second line">
-                <CheckBoxPreference android:title="Show second line" android:key="pref_layout_show_row2" android:summaryOn="Displaying a second line for events" android:summaryOff="Events have only one line" android:disableDependentsState="false" android:defaultValue="true"/>
-                <ListPreference android:title="Time to show" android:key="pref_layout_time_2" android:entryValues="@array/setting_time_choice_values" android:entries="@array/setting_time_choice_human" android:summary="Choose what time to display" android:dependency="pref_layout_show_row2" android:defaultValue="4"/>
-           		<ListPreference android:key="pref_layout_text_2" android:title="Text to show" android:entryValues="@array/setting_text_choice_values" android:entries="@array/setting_text_choice_human" android:summary="Choose what text to display" android:dependency="pref_layout_show_row2" android:defaultValue="2"/>
+                <CheckBoxPreference android:title="Show second line" android:key="pref_layout_show_row2" android:summaryOn="Displaying a second line for events" android:summaryOff="Events have only one line" android:disableDependentsState="false" android:defaultValue="true" />
+                <ListPreference android:title="Time to show" android:key="pref_layout_time_2" android:entryValues="@array/setting_time_choice_values" android:entries="@array/setting_time_choice_human" android:summary="Choose what time to display" android:dependency="pref_layout_show_row2" android:defaultValue="4" />
+           		<ListPreference android:key="pref_layout_text_2" android:title="Text to show" android:entryValues="@array/setting_text_choice_values" android:entries="@array/setting_text_choice_human" android:summary="Choose what text to display" android:dependency="pref_layout_show_row2" android:defaultValue="2" />
             </PreferenceCategory>
-        </PreferenceScreen>
-        <PreferenceScreen android:key="pref_screen_allday_event_layout" android:title="Choose all-day event layout">
+        </PreferenceScreen><PreferenceScreen android:key="pref_screen_allday_event_layout" android:title="All-day event layout">
             <PreferenceCategory android:title="First line">
-            <ListPreference android:key="pref_layout_ad_text_1" android:title="Text to show" android:entryValues="@array/setting_text_choice_values" android:entries="@array/setting_text_choice_human" android:summary="Choose what text to display" android:defaultValue="1"/>
+            <ListPreference android:key="pref_layout_ad_text_1" android:title="Text to show" android:entryValues="@array/setting_text_choice_values" android:entries="@array/setting_text_choice_human" android:summary="Choose what text to display" android:defaultValue="1" />
             </PreferenceCategory>
             <PreferenceCategory android:title="Second line">
-                <CheckBoxPreference android:title="Show second line" android:key="pref_layout_ad_show_row2" android:summaryOn="Displaying a second line for events" android:summaryOff="Events have only one line" android:disableDependentsState="false" android:defaultValue="false"/>
-           		<ListPreference android:key="pref_layout_ad_text_2" android:title="Text to show" android:entryValues="@array/setting_text_choice_values" android:entries="@array/setting_text_choice_human" android:summary="Choose what text to display" android:dependency="pref_layout_ad_show_row2" android:defaultValue="2"/>
+                <CheckBoxPreference android:title="Show second line" android:key="pref_layout_ad_show_row2" android:summaryOn="Displaying a second line for events" android:summaryOff="Events have only one line" android:disableDependentsState="false" android:defaultValue="false" />
+           		<ListPreference android:key="pref_layout_ad_text_2" android:title="Text to show" android:entryValues="@array/setting_text_choice_values" android:entries="@array/setting_text_choice_human" android:summary="Choose what text to display" android:dependency="pref_layout_ad_show_row2" android:defaultValue="2" />
             </PreferenceCategory>
-        </PreferenceScreen>
-    <CheckBoxPreference android:summaryOn="Showing times in 12h format" android:title="12h time" android:key="pref_12h" android:summaryOff="Showing times in 24h format" android:defaultValue="false" android:disableDependentsState="false" /><CheckBoxPreference android:dependency="pref_12h" android:title="Show am/pm" android:key="pref_ampm" android:defaultValue="true" android:summaryOn="Appending am or pm to times" android:summaryOff="Not appending am or pm" />
-    
+        </PreferenceScreen></PreferenceCategory>
+    <PreferenceCategory android:title="Time format"><CheckBoxPreference android:key="pref_separator_date" android:title="Show date on weekday separators" android:summaryOff='Showing "Wednesday"' android:summaryOn='Showing "Wednesday, Jan 29"' android:defaultValue="false"/><CheckBoxPreference android:dependency="pref_12h" android:title="Show am/pm" android:key="pref_ampm" android:defaultValue="true" android:summaryOn="Appending am or pm to times" android:summaryOff="Not appending am or pm" /><CheckBoxPreference android:summaryOn="Showing times in 12h format" android:title="12h time" android:key="pref_12h" android:summaryOff="Showing times in 24h format" android:defaultValue="false" android:disableDependentsState="false" />
     
 </PreferenceCategory>
     
