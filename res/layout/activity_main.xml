@@ -12,6 +12,33 @@
         android:id="@+id/textView1"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Welcome to the AgendaWatchface app. You can install the watch app through the menu. In the settings, you can choose which calendars to display." />
+        android:text="Welcome to the AgendaWatchface companion app. "
+        android:textAppearance="?android:attr/textAppearanceMedium" />
+
+    <TextView
+        android:id="@+id/watchfaceVersionView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentLeft="true"
+        android:text="Installed watchapp: ?"
+        android:textAppearance="?android:attr/textAppearanceMedium" />
+
+    <TextView
+        android:id="@+id/lastSyncView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/watchfaceVersionView"
+        android:layout_alignParentLeft="true"
+        android:text="Last sync: ?"
+        android:textAppearance="?android:attr/textAppearanceMedium" />
+
+    <Button
+        android:id="@+id/updateButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/lastSyncView"
+        android:layout_alignLeft="@+id/lastSyncView"
+        android:text="Install watchapp" />
 
 </RelativeLayout>

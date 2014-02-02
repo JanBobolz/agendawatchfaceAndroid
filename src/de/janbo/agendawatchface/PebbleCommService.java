@@ -16,8 +16,10 @@ import android.app.Service;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.database.ContentObserver;
+import android.net.Uri;
 import android.os.IBinder;
 import android.preference.PreferenceManager;
 import android.support.v4.app.NotificationCompat;
@@ -29,9 +31,16 @@ import android.util.Log;
  */
 public class PebbleCommService extends Service {
 	public static final UUID PEBBLE_APP_UUID = UUID.fromString("1f366804-f1d2-4288-b71a-708661777887");
-	public static final byte CURRENT_WATCHAPP_VERSION_BUNDLED = 4; //expected watchapp version. If watch reports different, prompt the user to update
+	public static final byte CURRENT_WATCHAPP_VERSION_BUNDLED = 5; //bundled watchapp version
+	public static final byte CURRENT_WATCHAPP_VERSION_MINIMUM = 4; //smallest version of watchapp that is still supported
 
 	public static final int MAX_NUM_EVENTS_TO_SEND = 10; //should correspond to number of items saved in the watch database
+	
+	// Android app internals
+	public static final String INTENT_ACTION_WATCHAPP_GIVE_INFO = "de.janbo.agendawatchface.intent.action.givedata"; //answers to requests will be broadcast using this action
+	public static final String INTENT_ACTION_WATCHAPP_REQUEST_INFO = "de.janbo.agendawatchface.intent.action.requestdata"; //request state data from this service
+	public static final String INTENT_EXTRA_WATCHAPP_VERSION = "de.janbo.agendawatchface.intent.extra.version"; //version of watchface or -1 if unknown
+	public static final String INTENT_EXTRA_WATCHAPP_LAST_SYNC = "de.janbo.agendawatchface.intent.extra.lastsync"; //time since epoch in ms for last successful sync. Or -1
 
 	// Protocol states
 	public static final int STATE_WAIT_FOR_WATCH_REQUEST = 0; // Nothing happening
@@ -42,7 +51,7 @@ public class PebbleCommService extends Service {
 
 	// Pebble dictionary keys
 	public static final int PEBBLE_KEY_COMMAND = 0; // uint_8
-	public static final int PEBBLE_KEY_VERSION = 1; // uint_8
+	public static final int PEBBLE_KEY_VERSION = 1; // uint_8, minimal watchapp version for syncing
 	public static final int PEBBLE_KEY_NUM_EVENTS = 10; // uint_8
 	public static final int PEBBLE_KEY_CAL_TITLE = 1; // String
 	public static final int PEBBLE_KEY_CAL_LOC = 2; // String
@@ -52,7 +61,8 @@ public class PebbleCommService extends Service {
 	public static final int PEBBLE_KEY_SETTINGS_BOOLFLAGS = 40; // uint_32
 	public static final int PEBBLE_KEY_SETTINGS_DESIGN = 41; //uint_32
 
-	public static final int PEBBLE_TO_PHONE_KEY_VERSION = 0;
+	public static final int PEBBLE_TO_PHONE_KEY_VERSION = 0; //current version of the watchface
+	public static final int PEBBLE_TO_PHONE_KEY_VERSIONBACKWARD = 1; //version of bundled firmware that this app must have to support the watchface version
 
 	// Pebble commands
 	public static final byte PEBBLE_COMMAND_CAL_EVENT = 1;
@@ -74,6 +84,8 @@ public class PebbleCommService extends Service {
 	private int numRetries = 0; //number of times we tried to send this data
 	
 	private long notificationIssued = -1; //time since epoch in ms where update prompt was issued last
+	private int watchfaceVersion = -1; //last version the watchface reported
+	private long lastSync = -1; //time since epoch in ms where last sync went through
 	
 	private ContentObserver calendarObserver = new ContentObserver(null) { //content observer looking for calendar changes
 		@Override
@@ -81,6 +93,13 @@ public class PebbleCommService extends Service {
 			Log.d("PebbleCommunication", "Calendar changed (observer fired)");
 			if (state == STATE_WAIT_FOR_WATCH_REQUEST)
 				beginSendingData();
+		}
+	};
+	
+	private BroadcastReceiver infoRequestReceiver = new BroadcastReceiver() {
+		@Override
+		public void onReceive(Context context, Intent intent) {
+			broadcastCurrentData();
 		}
 	};
 
@@ -115,11 +134,17 @@ public class PebbleCommService extends Service {
 			@Override
 			public void receiveData(Context context, int transactionId, PebbleDictionary data) {
 				PebbleKit.sendAckToPebble(context, transactionId); //every message from the pebble must be ack'ed
-				requestReceived(data.getInteger(PEBBLE_TO_PHONE_KEY_VERSION)); 
+				requestReceived(data.getInteger(PEBBLE_TO_PHONE_KEY_VERSION), data.contains(PEBBLE_TO_PHONE_KEY_VERSIONBACKWARD) ? data.getInteger(PEBBLE_TO_PHONE_KEY_VERSIONBACKWARD) : 4); 
 			}
 		});
 		
+		//Register for calendar changes
 		CalendarReader.registerCalendarObserver(this, calendarObserver);
+		
+		//Register for info requests
+		IntentFilter filter = new IntentFilter();
+		filter.addAction(PebbleCommService.INTENT_ACTION_WATCHAPP_REQUEST_INFO);
+		registerReceiver(infoRequestReceiver, filter);
 	}
 
 	@Override
@@ -191,6 +216,8 @@ public class PebbleCommService extends Service {
 		case STATE_SENT_DONE_MSG_WAIT_FOR_ACK: //ack was for done message. This concludes the sync process
 			state = STATE_WAIT_FOR_WATCH_REQUEST;
 			Log.d("PebbleCommunication", "Sync complete :)");
+			lastSync = System.currentTimeMillis();
+			broadcastCurrentData();
 			break;
 		}
 	}
@@ -198,17 +225,23 @@ public class PebbleCommService extends Service {
 	/**
 	 * Handle the watch requesting new data. 
 	 * Checks watchapp version, issues update prompt or starts sending data
-	 * @param version
+	 * @param version version of the watchface
+	 * @param minVersion version the watchface expects of this app (bundled watchface version)
 	 */
-	private synchronized void requestReceived(Long version) {
+	private synchronized void requestReceived(Long version, Long minVersion) {
 		Log.d("PebbleCommunication", "Received sync request in state " + state + " for version " + version);
-		if (version == null || version != CURRENT_WATCHAPP_VERSION_BUNDLED) { // catch outdated watchapps
+		if (minVersion == null || minVersion > CURRENT_WATCHAPP_VERSION_BUNDLED) { //watchface expects newer Android app
+			triggerAndroidAppUpdateNotification();
+			state = STATE_WAIT_FOR_WATCH_REQUEST;
+		} else if (version == null || version < CURRENT_WATCHAPP_VERSION_MINIMUM) { // watchface very outdated
 			triggerUpdateNotification();
 			state = STATE_WAIT_FOR_WATCH_REQUEST;
-			return;
-		}
+		} else //everything good. Give the watch its data :)
+			beginSendingData();
 		
-		beginSendingData();
+		//Notify the activity if it's listening
+		watchfaceVersion = version == null ? -1 : version.intValue();
+		broadcastCurrentData();
 	}
 
 	/**
@@ -288,7 +321,7 @@ public class PebbleCommService extends Service {
 		PebbleDictionary data = new PebbleDictionary();
 		data.addUint8(PEBBLE_KEY_COMMAND, PEBBLE_COMMAND_INIT_DATA); //command
 		data.addUint8(PEBBLE_KEY_NUM_EVENTS, (byte) numberOfEvents); //number of events we will send
-		data.addUint8(PEBBLE_KEY_VERSION, CURRENT_WATCHAPP_VERSION_BUNDLED); //expected watchapp version
+		data.addUint8(PEBBLE_KEY_VERSION, CURRENT_WATCHAPP_VERSION_MINIMUM); //expected minimum watchapp version
 		addPebbleSettings(data); //general and design settings
 		sendMessage(data, false);
 	}
@@ -370,11 +403,56 @@ public class PebbleCommService extends Service {
 		Intent intent = new Intent(getApplicationContext(), WatchappUpdateActivity.class);
 		
 		NotificationCompat.Builder builder = new NotificationCompat.Builder(this).setSmallIcon(R.drawable.ic_launcher).setContentTitle("AgendaWatchface Update")
-				.setContentText("There is an update for AgendaWatchface on your Pebble! :)");
+				.setContentText("There is an update for AgendaWatchface on your Pebble! :) - Please update, otherwise synchronization will not work.");
 		builder.setContentIntent(PendingIntent.getActivity(getApplicationContext(), 0, intent, Intent.FLAG_ACTIVITY_NEW_TASK));
 		builder.setAutoCancel(true);
 		NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
 		
 		manager.notify(1, builder.build());
+	}
+	
+	/**
+	 * Shows a notification prompting the user to update the Android app
+	 */
+	private void triggerAndroidAppUpdateNotification() {
+		if (notificationIssued != -1 && System.currentTimeMillis()-notificationIssued < 1000*60*60) //don't spam it
+			return;
+		
+		notificationIssued = System.currentTimeMillis();
+		
+		Intent intent;
+		try {
+		    intent = new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=" + getPackageName()));
+		} catch (android.content.ActivityNotFoundException anfe) {
+		    intent = new Intent(Intent.ACTION_VIEW, Uri.parse("http://play.google.com/store/apps/details?id=" + getPackageName()));
+		}
+		
+		NotificationCompat.Builder builder = new NotificationCompat.Builder(this).setSmallIcon(R.drawable.ic_launcher).setContentTitle("AgendaWatchface Update")
+				.setContentText("There is an update for the Android app. Please update, otherwise synchronization with your newer version watchapp will not work.");
+		
+		builder.setContentIntent(PendingIntent.getActivity(getApplicationContext(), 0, intent, Intent.FLAG_ACTIVITY_NEW_TASK));
+		builder.setAutoCancel(true);
+		NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+		
+		manager.notify(1, builder.build());
+	}
+	
+	/**
+	 * Gives the current version of the watchapp, last sync time, etc... to any broadcast listeners (like the MainActivity)
+	 */
+	private void broadcastCurrentData() {
+		Intent intent = new Intent();
+		intent.setAction(INTENT_ACTION_WATCHAPP_GIVE_INFO);
+		intent.putExtra(INTENT_EXTRA_WATCHAPP_VERSION, watchfaceVersion);
+		intent.putExtra(INTENT_EXTRA_WATCHAPP_LAST_SYNC, lastSync);
+		sendBroadcast(intent);
+	}
+	
+	/**
+	 * Starts the watchapp on the watch
+	 * @param context application context
+	 */
+	public static void startWatchapp(Context context) {
+		PebbleKit.startAppOnPebble(context.getApplicationContext(), PEBBLE_APP_UUID);
 	}
 }
