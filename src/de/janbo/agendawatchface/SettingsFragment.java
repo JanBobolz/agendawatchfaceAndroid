@@ -20,6 +20,7 @@ public class SettingsFragment extends PreferenceFragment {
 			pref.setDefaultValue(Boolean.TRUE);
 			pref.setKey("pref_cal_"+cal.id+"_picked");
 			pref.setTitle(cal.name);
+			pref.setSummary(cal.account);
 			
 			calPickScreen.addPreference(pref);
 		}

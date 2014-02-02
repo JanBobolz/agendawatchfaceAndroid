@@ -8,23 +8,17 @@ import android.content.ContentResolver;
 import android.content.ContentUris;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.database.ContentObserver;
 import android.database.Cursor;
 import android.net.Uri;
 import android.preference.PreferenceManager;
 import android.provider.CalendarContract.Calendars;
+import android.provider.CalendarContract.Events;
 import android.provider.CalendarContract.Instances;
 import android.util.Log;
 
 public class CalendarReader {
-	/**
-	 * Gives a list of at most maxNum Calendar events in the next ... days 
-	 * @param context
-	 * @return
-	 */
-	public static ArrayList<CalendarEvent> getEvents(Context context, int maxNum) {
-		ArrayList<CalendarEvent> events = new ArrayList<CalendarEvent>();
-		
-		// Specify the date range for searching events
+	protected static Uri getContentUri() {
 		Calendar beginTime = Calendar.getInstance();
 		beginTime.add(Calendar.DAY_OF_MONTH, -1);
 		beginTime.set(Calendar.HOUR_OF_DAY, 23);
@@ -37,18 +31,29 @@ public class CalendarReader {
 		endTime.add(Calendar.DAY_OF_MONTH, 6);
 		long endMillis = endTime.getTimeInMillis();
 
-		Cursor cur = null;
-		ContentResolver cr = context.getContentResolver();
-		String selection = null;
-		String[] selectionArgs = null;
-
 		// Construct the query with the desired date range.
 		Uri.Builder builder = Instances.CONTENT_URI.buildUpon();
 		ContentUris.appendId(builder, startMillis);
 		ContentUris.appendId(builder, endMillis);
 		
+		return builder.build();
+	}
+	
+	/**
+	 * Gives a list of at most maxNum Calendar events in the next ... days 
+	 * @param context
+	 * @return
+	 */
+	public static ArrayList<CalendarEvent> getEvents(Context context, int maxNum) {
+		ArrayList<CalendarEvent> events = new ArrayList<CalendarEvent>();
+		
+		Cursor cur = null;
+		ContentResolver cr = context.getContentResolver();
+		String selection = null;
+		String[] selectionArgs = null;
+		
 		// Submit the query
-		cur = cr.query(builder.build(), new String[] { Instances.CALENDAR_ID, Instances.EVENT_ID, Instances.EVENT_LOCATION, Instances.BEGIN, Instances.END, Instances.TITLE, Instances.ALL_DAY }, selection, selectionArgs,
+		cur = cr.query(getContentUri(), new String[] { Instances.CALENDAR_ID, Instances.EVENT_ID, Instances.EVENT_LOCATION, Instances.BEGIN, Instances.END, Instances.TITLE, Instances.ALL_DAY }, selection, selectionArgs,
 				Instances.BEGIN + " ASC");
 
 		long now = Calendar.getInstance().getTimeInMillis();
@@ -89,14 +94,32 @@ public class CalendarReader {
 		Uri uri = Calendars.CONTENT_URI;   
 		String selection = null;
 		String[] selectionArgs = null; 
-		cur = cr.query(uri, new String[]{Calendars._ID, Calendars.NAME}, selection, selectionArgs, null);
+		cur = cr.query(uri, new String[]{Calendars._ID, Calendars.NAME, Calendars.CALENDAR_DISPLAY_NAME, Calendars.ACCOUNT_NAME}, selection, selectionArgs, null);
 		
 		while (cur.moveToNext()) {
-			result.add(new CalendarInstance(cur.getLong(cur.getColumnIndex(Calendars._ID)), cur.getString(cur.getColumnIndex(Calendars.NAME))));
+			result.add(new CalendarInstance(cur.getLong(cur.getColumnIndex(Calendars._ID)), cur.getString(cur.getColumnIndex(Calendars.CALENDAR_DISPLAY_NAME)), cur.getString(cur.getColumnIndex(Calendars.ACCOUNT_NAME))));
 		}
 		
 		cur.close();
 		
 		return result;
+	}
+	
+	/**
+	 * Registers an observer for calendar changes
+	 * @param context
+	 * @param observer
+	 */
+	public static void registerCalendarObserver(Context context, ContentObserver observer) {
+		context.getContentResolver().registerContentObserver(Events.CONTENT_URI, true, observer);
+	}
+	
+	/**
+	 * Unregisters observer for calendar changes
+	 * @param context
+	 * @param observer
+	 */
+	public static void unregisterCalendarObserver(Context context, ContentObserver observer) {
+		context.getContentResolver().unregisterContentObserver(observer);
 	}
 }

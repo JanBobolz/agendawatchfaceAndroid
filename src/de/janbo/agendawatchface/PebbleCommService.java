@@ -17,6 +17,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.database.ContentObserver;
 import android.os.IBinder;
 import android.preference.PreferenceManager;
 import android.support.v4.app.NotificationCompat;
@@ -68,7 +69,20 @@ public class PebbleCommService extends Service {
 	private BroadcastReceiver nackReceiver = null;
 	private BroadcastReceiver dataReceiver = null;
 	
+	private PebbleDictionary lastSentDict = null; //data last sent. Used for retries
+	private int transactionFlying = -1; //id of the transaction last sent
+	private int numRetries = 0; //number of times we tried to send this data
+	
 	private long notificationIssued = -1; //time since epoch in ms where update prompt was issued last
+	
+	private ContentObserver calendarObserver = new ContentObserver(null) { //content observer looking for calendar changes
+		@Override
+		public void onChange(boolean selfChange) {
+			Log.d("PebbleCommunication", "Calendar changed (observer fired)");
+			if (state == STATE_WAIT_FOR_WATCH_REQUEST)
+				beginSendingData();
+		}
+	};
 
 	@Override
 	public IBinder onBind(Intent intent) { //this is not a bound service
@@ -86,14 +100,14 @@ public class PebbleCommService extends Service {
 		ackReceiver = PebbleKit.registerReceivedAckHandler(this, new PebbleAckReceiver(PEBBLE_APP_UUID) {
 			@Override
 			public void receiveAck(Context context, int transactionId) {
-				ackReceived();
+				ackReceived(transactionId);
 			}
 		});
 
 		nackReceiver = PebbleKit.registerReceivedNackHandler(this, new PebbleNackReceiver(PEBBLE_APP_UUID) {
 			@Override
 			public void receiveNack(Context context, int transactionId) {
-				nackReceived();
+				nackReceived(transactionId);
 			}
 		});
 
@@ -104,6 +118,8 @@ public class PebbleCommService extends Service {
 				requestReceived(data.getInteger(PEBBLE_TO_PHONE_KEY_VERSION)); 
 			}
 		});
+		
+		CalendarReader.registerCalendarObserver(this, calendarObserver);
 	}
 
 	@Override
@@ -116,6 +132,8 @@ public class PebbleCommService extends Service {
 			unregisterReceiver(nackReceiver);
 		if (dataReceiver != null)
 			unregisterReceiver(dataReceiver);
+		
+		CalendarReader.unregisterCalendarObserver(this, calendarObserver);
 	}
 
 	@Override
@@ -132,8 +150,12 @@ public class PebbleCommService extends Service {
 
 	/**
 	 * Pebble got our last message. Send next one according to current state
+	 * @param transactionId 
 	 */
-	private void ackReceived() {
+	private synchronized void ackReceived(int transactionId) {
+		if (transactionId != transactionFlying) {
+			Log.d("PebbleCommunication", "Received unexpected ack. Ignoring");
+		}
 		Log.d("PebbleCommunication", "Received ack in state " + state);
 		switch (state) {
 		case STATE_WAIT_FOR_WATCH_REQUEST: //we're not expecting an ack
@@ -178,7 +200,7 @@ public class PebbleCommService extends Service {
 	 * Checks watchapp version, issues update prompt or starts sending data
 	 * @param version
 	 */
-	private void requestReceived(Long version) {
+	private synchronized void requestReceived(Long version) {
 		Log.d("PebbleCommunication", "Received sync request in state " + state + " for version " + version);
 		if (version == null || version != CURRENT_WATCHAPP_VERSION_BUNDLED) { // catch outdated watchapps
 			triggerUpdateNotification();
@@ -190,11 +212,23 @@ public class PebbleCommService extends Service {
 	}
 
 	/**
-	 * Just log nacks and reset process. Worst case: watch asks for new sync next minute.
+	 * Handle nacks: resend if necessary
+	 * @param transactionId 
 	 */
-	private void nackReceived() {
-		Log.d("PebbleCommunication", "Received Nack in state " + state);
-		state = STATE_WAIT_FOR_WATCH_REQUEST;
+	private void nackReceived(int transactionId) {
+		if (transactionId == transactionFlying) {
+			if (state == STATE_INIT_SENT) {
+				Log.d("PebbleCommunication", "Received (expected) Nack for init message. Will not retry");
+			} else {
+				Log.d("PebbleCommunication", "Received (expected) Nack in state " + state +" resend counter: "+numRetries);
+				if (!sendMessage(lastSentDict, true)) {
+					Log.d("PebbleCommunication", "Retries exhausted. Resetting state to begin again");
+					state = STATE_WAIT_FOR_WATCH_REQUEST;
+				}
+			}
+		} else {
+			Log.d("PebbleCommunication", "Received unexpected Nack in state " + state);
+		}
 	}
 	
 	/**
@@ -234,7 +268,7 @@ public class PebbleCommService extends Service {
 	/**
 	 * Kicks off sync process by reading calendar data and sending init message
 	 */
-	private void beginSendingData() {
+	private synchronized void beginSendingData() {
 		if (state != STATE_WAIT_FOR_WATCH_REQUEST) {
 			Log.d("PebbleCommunication", "Restarting sending of events");
 		}
@@ -256,7 +290,7 @@ public class PebbleCommService extends Service {
 		data.addUint8(PEBBLE_KEY_NUM_EVENTS, (byte) numberOfEvents); //number of events we will send
 		data.addUint8(PEBBLE_KEY_VERSION, CURRENT_WATCHAPP_VERSION_BUNDLED); //expected watchapp version
 		addPebbleSettings(data); //general and design settings
-		PebbleKit.sendDataToPebble(getApplicationContext(), PEBBLE_APP_UUID, data);
+		sendMessage(data, false);
 	}
 
 	/**
@@ -269,7 +303,7 @@ public class PebbleCommService extends Service {
 		data.addString(PEBBLE_KEY_CAL_TITLE, e.title == null ? "(no title)" : e.title.length() > 30 ? e.title.substring(0, 30) : e.title);
 		data.addString(PEBBLE_KEY_CAL_LOC, e.location == null ? "" : e.location.length() > 30 ? e.location.substring(0, 30) : e.location);
 		data.addUint8(PEBBLE_KEY_CAL_ALLDAY, e.allDay ? (byte) 1 : (byte) 0);
-		PebbleKit.sendDataToPebble(getApplicationContext(), PEBBLE_APP_UUID, data);
+		sendMessage(data, false);
 	}
 
 	/**
@@ -294,7 +328,7 @@ public class PebbleCommService extends Service {
 						* cal.get(Calendar.MONTH) + 60 * 24 * 7 * 32 * 12 * (cal.get(Calendar.YEAR) - 1900))); //format is documented in watchapp and above for PEBBLE_KEY_CAL_START_TIME
 
 		// Send data
-		PebbleKit.sendDataToPebble(getApplicationContext(), PEBBLE_APP_UUID, data);
+		sendMessage(data, false);
 	}
 
 	/**
@@ -303,7 +337,25 @@ public class PebbleCommService extends Service {
 	private void sendDoneMessage() {
 		PebbleDictionary data2 = new PebbleDictionary();
 		data2.addUint8(PEBBLE_KEY_COMMAND, PEBBLE_COMMAND_DONE);
-		PebbleKit.sendDataToPebble(getApplicationContext(), PEBBLE_APP_UUID, data2);
+		sendMessage(data2, false);
+	}
+	
+	/**
+	 * Sends data to the watch.
+	 * Only resends once
+	 * @param resend whether or not this message has been sent already at some point
+	 * @return true iff message was sent. false if retries have been exhausted.
+	 */
+	private synchronized boolean sendMessage(PebbleDictionary data, boolean resend) {
+		transactionFlying = (transactionFlying+1) % 256; //new transaction
+		if ((numRetries = resend ? numRetries+1 : 0) > 1) {
+			Log.d("PebbleCommunication", "Stopped retrying message sending in state "+state);
+			return false;
+		}
+		
+		lastSentDict = data;
+		PebbleKit.sendDataToPebbleWithTransactionId(getApplicationContext(), PEBBLE_APP_UUID, data, transactionFlying);
+		return true;
 	}
 
 	/**
