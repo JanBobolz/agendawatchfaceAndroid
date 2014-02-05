@@ -1,8 +1,6 @@
 package de.janbo.agendawatchface;
 
-import java.util.Calendar;
 import java.util.List;
-import java.util.TimeZone;
 import java.util.UUID;
 
 import com.getpebble.android.kit.PebbleKit;
@@ -347,23 +345,10 @@ public class PebbleCommService extends Service {
 	private void sendSecondEventHalf(CalendarEvent e) {
 		PebbleDictionary data = new PebbleDictionary();
 		data.addUint8(PEBBLE_KEY_COMMAND, PEBBLE_COMMAND_CAL_EVENT_TIME);
-		Calendar cal = Calendar.getInstance();
 
-		// Set start time
-		cal.setTime(e.startTime);
-		if (e.allDay)
-			cal.setTimeZone(TimeZone.getTimeZone("UTC")); //all-day events must be interpreted as UTC and begin/end on day boundaries
-		data.addInt32(PEBBLE_KEY_CAL_START_TIME,
-				(cal.get(Calendar.MINUTE) + 60 * cal.get(Calendar.HOUR_OF_DAY) + 60 * 24 * ((cal.get(Calendar.DAY_OF_WEEK) + 5) % 7) + 60 * 24 * 7 * cal.get(Calendar.DAY_OF_MONTH) + 60 * 24 * 7 * 32
-						* cal.get(Calendar.MONTH) + 60 * 24 * 7 * 32 * 12 * (cal.get(Calendar.YEAR) - 1900))); //format is documented in watchapp and above for PEBBLE_KEY_CAL_START_TIME
-
-		// Set end time
-		cal.setTime(e.endTime);
-		if (e.allDay)
-			cal.setTimeZone(TimeZone.getTimeZone("UTC"));
-		data.addInt32(PEBBLE_KEY_CAL_END_TIME,
-				(cal.get(Calendar.MINUTE) + 60 * cal.get(Calendar.HOUR_OF_DAY) + 60 * 24 * ((cal.get(Calendar.DAY_OF_WEEK) + 5) % 7) + 60 * 24 * 7 * cal.get(Calendar.DAY_OF_MONTH) + 60 * 24 * 7 * 32
-						* cal.get(Calendar.MONTH) + 60 * 24 * 7 * 32 * 12 * (cal.get(Calendar.YEAR) - 1900))); //format is documented in watchapp and above for PEBBLE_KEY_CAL_START_TIME
+		// Set times
+		data.addInt32(PEBBLE_KEY_CAL_START_TIME, e.getStartTimeInPebbleFormat());
+		data.addInt32(PEBBLE_KEY_CAL_END_TIME, e.getEndTimeInPebbleFormat());
 
 		// Send data
 		sendMessage(data, false);

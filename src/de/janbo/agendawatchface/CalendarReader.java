@@ -2,8 +2,8 @@ package de.janbo.agendawatchface;
 
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
-
 import android.content.ContentResolver;
 import android.content.ContentUris;
 import android.content.Context;
@@ -15,7 +15,6 @@ import android.preference.PreferenceManager;
 import android.provider.CalendarContract.Calendars;
 import android.provider.CalendarContract.Events;
 import android.provider.CalendarContract.Instances;
-import android.util.Log;
 
 public class CalendarReader {
 	protected static Uri getContentUri() {
@@ -59,7 +58,7 @@ public class CalendarReader {
 		long now = Calendar.getInstance().getTimeInMillis();
 		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
 		boolean ignoreAllDayEvents = !prefs.getBoolean("pref_show_all_day_events", true);
-		while (cur.moveToNext() && events.size() < maxNum) {
+		while (cur.moveToNext()) {
 			//Filter all-day-events if set to ignore them
 			if (ignoreAllDayEvents && cur.getInt(cur.getColumnIndex(Instances.ALL_DAY)) != 0)
 				continue;
@@ -77,6 +76,14 @@ public class CalendarReader {
 					.getColumnIndex(Instances.BEGIN))), new Date(cur.getLong(cur.getColumnIndex(Instances.END))), cur.getInt(cur.getColumnIndex(Instances.ALL_DAY)) != 0));
 		}
 		cur.close();
+		
+		//Now all events are in the events array, but may be out of order. And too many
+		//Sort
+		Collections.sort(events);
+		
+		//Trim
+		if (events.size() > maxNum)
+			events.subList(maxNum, events.size()).clear();
 
 		return events;
 	}
