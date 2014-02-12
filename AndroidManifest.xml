@@ -29,7 +29,7 @@
 
         <service
             android:name="PebbleCommService"
-            android:label="Pebble Communication Service" >
+            android:label="Pebble Communication Service" android:stopWithTask="false">
         </service>
 
         <receiver
