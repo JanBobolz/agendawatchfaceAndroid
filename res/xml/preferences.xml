@@ -30,9 +30,10 @@
            		<ListPreference android:key="pref_layout_ad_text_2" android:title="Text to show" android:entryValues="@array/setting_text_choice_values" android:entries="@array/setting_text_choice_human" android:summary="Choose what text to display" android:dependency="pref_layout_ad_show_row2" android:defaultValue="2" />
             </PreferenceCategory>
         </PreferenceScreen></PreferenceCategory>
-    <PreferenceCategory android:title="Time format"><CheckBoxPreference android:key="pref_separator_date" android:title="Show date on weekday separators" android:summaryOff='Showing "Wednesday"' android:summaryOn='Showing "Wednesday, Jan 29"' android:defaultValue="false"/><CheckBoxPreference android:dependency="pref_12h" android:title="Show am/pm" android:key="pref_ampm" android:defaultValue="true" android:summaryOn="Appending am or pm to times" android:summaryOff="Not appending am or pm" /><CheckBoxPreference android:summaryOn="Showing times in 12h format" android:title="12h time" android:key="pref_12h" android:summaryOff="Showing times in 24h format" android:defaultValue="false" android:disableDependentsState="false" />
+    <PreferenceCategory android:title="Time format"><CheckBoxPreference android:key="pref_separator_date" android:title="Show date on weekday separators" android:summaryOff='Showing "Wednesday"' android:summaryOn='Showing "Wednesday, Jan 29"' android:defaultValue="false"/><CheckBoxPreference android:summaryOn="Showing times in 12h format" android:title="12h time" android:key="pref_12h" android:summaryOff="Showing times in 24h format" android:defaultValue="false" android:disableDependentsState="false" /><CheckBoxPreference android:dependency="pref_12h" android:title="Show am/pm" android:key="pref_ampm" android:defaultValue="true" android:summaryOn="Appending am or pm to times" android:summaryOff="Not appending am or pm" />
     
 </PreferenceCategory>
+    
     
     
     

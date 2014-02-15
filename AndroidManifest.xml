@@ -45,6 +45,11 @@
         </receiver>
         <activity android:name="SettingsActivity"></activity>
         <activity android:name="WatchappUpdateActivity"></activity>
+        <receiver android:name="PebbleDataBroadcastReceiver">
+            <intent-filter>
+                <action android:name="com.getpebble.action.app.RECEIVE"/>
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
