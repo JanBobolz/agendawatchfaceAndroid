@@ -104,6 +104,11 @@ public class MainActivity extends Activity {
 		case R.id.action_settings:
 			startActivity(new Intent(this, SettingsActivity.class));
 			return true;
+		case R.id.action_show_appstore:
+			Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("pebble://appstore/52e81244e822d1bdda00004a"));
+			intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
+			startActivity(intent);
+			return true;
 		default:
 			return false;
 		}
