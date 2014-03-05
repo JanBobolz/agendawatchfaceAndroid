@@ -32,7 +32,7 @@ import android.util.Log;
  */
 public class PebbleCommService extends Service {
 	public static final UUID PEBBLE_APP_UUID = UUID.fromString("1f366804-f1d2-4288-b71a-708661777887");
-	public static final byte CURRENT_WATCHAPP_VERSION_BUNDLED = 6; // bundled watchapp version
+	public static final byte CURRENT_WATCHAPP_VERSION_BUNDLED = 7; // bundled watchapp version
 	public static final byte CURRENT_WATCHAPP_VERSION_MINIMUM = 4; // smallest version of watchapp that is still supported
 
 	public static final int MAX_NUM_EVENTS_TO_SEND = 10; // should correspond to number of items saved in the watch database
@@ -154,6 +154,8 @@ public class PebbleCommService extends Service {
 		super.onCreate();
 
 		Log.d("PebbleCommunication", "Service created");
+		
+		watchfaceVersion = PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).getInt("last_reported_watchface_version", -1);
 
 		// Register receivers
 		ackReceiver = PebbleKit.registerReceivedAckHandler(this, new PebbleAckReceiver(PEBBLE_APP_UUID) {
@@ -193,6 +195,7 @@ public class PebbleCommService extends Service {
 		CalendarReader.unregisterCalendarObserver(this, calendarObserver);
 
 		instance = null;
+		PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).edit().putInt("last_reported_watchface_version", watchfaceVersion).commit();
 	}
 
 	@Override
@@ -351,6 +354,7 @@ public class PebbleCommService extends Service {
 		flags |= Integer.parseInt(prefs.getString("pref_header_time_size", "0")) % 2 == 1 ? 0x80 : 0;
 		flags |= Integer.parseInt(prefs.getString("pref_header_time_size", "0")) > 1 ? 0x100 : 0;
 		flags |= prefs.getBoolean("pref_separator_date", false) ? 0x200 : 0;
+		flags |= prefs.getBoolean("pref_layout_countdown", false) ? 0x400 : 0;
 
 		dict.addUint32(PEBBLE_KEY_SETTINGS_BOOLFLAGS, flags);
 

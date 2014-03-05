@@ -9,7 +9,7 @@
     
     
 </PreferenceCategory>
-    <PreferenceCategory android:title="Event layout"><ListPreference android:key="pref_layout_font_size" android:entryValues="@array/setting_font_size_choice_values" android:title="Font size for events" android:entries="@array/setting_font_size_choice_human" android:defaultValue="0" /><PreferenceScreen android:key="pref_screen_event_layout" android:title="Regular event layout">
+    <PreferenceCategory android:title="Event layout"><ListPreference android:key="pref_layout_font_size" android:entryValues="@array/setting_font_size_choice_values" android:title="Font size for events" android:entries="@array/setting_font_size_choice_human" android:defaultValue="0" /><CheckBoxPreference android:key="pref_layout_countdown" android:title="Countdowns" android:summaryOn='Show countdowns (e.g., "45min") if time is close' android:summaryOff="Always show the time, never a countdown" android:defaultValue="false"/><PreferenceScreen android:key="pref_screen_event_layout" android:title="Regular event layout">
             
             <PreferenceCategory android:title="First line">
                 
@@ -21,6 +21,7 @@
                 <ListPreference android:title="Time to show" android:key="pref_layout_time_2" android:entryValues="@array/setting_time_choice_values" android:entries="@array/setting_time_choice_human" android:summary="Choose what time to display" android:dependency="pref_layout_show_row2" android:defaultValue="4" />
            		<ListPreference android:key="pref_layout_text_2" android:title="Text to show" android:entryValues="@array/setting_text_choice_values" android:entries="@array/setting_text_choice_human" android:summary="Choose what text to display" android:dependency="pref_layout_show_row2" android:defaultValue="2" />
             </PreferenceCategory>
+            
         </PreferenceScreen><PreferenceScreen android:key="pref_screen_allday_event_layout" android:title="All-day event layout">
             <PreferenceCategory android:title="First line">
             <ListPreference android:key="pref_layout_ad_text_1" android:title="Text to show" android:entryValues="@array/setting_text_choice_values" android:entries="@array/setting_text_choice_human" android:summary="Choose what text to display" android:defaultValue="1" />
