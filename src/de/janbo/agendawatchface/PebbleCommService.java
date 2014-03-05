@@ -33,7 +33,7 @@ import android.util.Log;
 public class PebbleCommService extends Service {
 	public static final UUID PEBBLE_APP_UUID = UUID.fromString("1f366804-f1d2-4288-b71a-708661777887");
 	public static final byte CURRENT_WATCHAPP_VERSION_BUNDLED = 7; // bundled watchapp version
-	public static final byte CURRENT_WATCHAPP_VERSION_MINIMUM = 4; // smallest version of watchapp that is still supported
+	public static final byte CURRENT_WATCHAPP_VERSION_MINIMUM = 7; // smallest version of watchapp that is still supported
 
 	public static final int MAX_NUM_EVENTS_TO_SEND = 10; // should correspond to number of items saved in the watch database
 
@@ -76,6 +76,7 @@ public class PebbleCommService extends Service {
 	public static final byte PEBBLE_COMMAND_INIT_DATA = 0;
 	public static final byte PEBBLE_COMMAND_DONE = 2;
 	public static final byte PEBBLE_COMMAND_NO_NEW_DATA = 4;
+	public static final byte PEBBLE_COMMAND_FORCE_REQUEST = 5; //requests the watch to send a request (to update version, etc.)
 
 	// Variables
 	private int state = STATE_WAIT_FOR_WATCH_REQUEST;
@@ -209,7 +210,7 @@ public class PebbleCommService extends Service {
 			}
 		} else if (intent != null) { // someone wants to simply start the service. Also start a sync
 			Log.d("PebbleCommunication", "onStartService() started forced update");
-			beginSendingData();
+			sendForceRequestMessage();
 		}
 
 		return START_STICKY; // we want the service to persist
@@ -414,6 +415,9 @@ public class PebbleCommService extends Service {
 		}
 	}
 	
+	/**
+	 * Inform the watch that its dataset is up-to-date
+	 */
 	private void sendNoNewDataMsg() {
 		Log.d("PebbleCommunication", "Informing watch that its dataset is up-to-date");
 		PebbleDictionary data = new PebbleDictionary();
@@ -475,6 +479,15 @@ public class PebbleCommService extends Service {
 	private void sendDoneMessage() {
 		PebbleDictionary data2 = new PebbleDictionary();
 		data2.addUint8(PEBBLE_KEY_COMMAND, PEBBLE_COMMAND_DONE);
+		sendMessage(data2, false);
+	}
+	
+	/**
+	 * Send message that we want the watch to request an update (e.g., to get to know its version)
+	 */
+	private void sendForceRequestMessage() {
+		PebbleDictionary data2 = new PebbleDictionary();
+		data2.addUint8(PEBBLE_KEY_COMMAND, PEBBLE_COMMAND_FORCE_REQUEST);
 		sendMessage(data2, false);
 	}
 
