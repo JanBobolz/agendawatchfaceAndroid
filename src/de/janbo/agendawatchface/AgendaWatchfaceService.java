@@ -42,18 +42,18 @@ import android.util.Log;
  */
 public class AgendaWatchfaceService extends Service {
 	public static final UUID PEBBLE_APP_UUID = UUID.fromString("1f366804-f1d2-4288-b71a-708661777887");
-	public static final byte CURRENT_WATCHAPP_VERSION_BUNDLED = 7; // bundled watchapp version
-	public static final byte CURRENT_WATCHAPP_VERSION_MINIMUM = 7; // smallest version of watchapp that is still supported
+	public static final byte CURRENT_WATCHAPP_VERSION_BUNDLED = 8; // bundled watchapp version
+	public static final byte CURRENT_WATCHAPP_VERSION_MINIMUM = 8; // smallest version of watchapp that is still supported
 
 	public static final int MAX_NUM_ITEMS_TO_SEND = 10; // should correspond to number of items saved in the watch database
-	public static final long WAIT_TIME_FOR_PLUGIN_REPORTS =  2*1000; //maximum time to wait with first sync before all plugins report (in ms)
-	public static final int PLUGIN_SYNC_INTERVAL = 30; //interval to get new data from plugins (in minutes)
+	public static final long WAIT_TIME_FOR_PLUGIN_REPORTS = 2 * 1000; // maximum time to wait with first sync before all plugins report (in ms)
+	public static final int PLUGIN_SYNC_INTERVAL = 30; // interval to get new data from plugins (in minutes)
 
 	// Android app internals
 	public static final String INTENT_ACTION_WATCHAPP_GIVE_INFO = "de.janbo.agendawatchface.intent.action.givedata"; // answers to requests will be broadcast using this action
 	public static final String INTENT_ACTION_WATCHAPP_REQUEST_INFO = "de.janbo.agendawatchface.intent.action.requestdata"; // request state data from this service
 	public static final String INTENT_ACTION_HANDLE_WATCHAPP_MESSAGE = "de.janbo.agendawatchface.intent.action.handlemessage"; // handle an incoming message from the watch
-	public static final String INTENT_ACTION_REFRESH_PLUGIN_DATA = "de.janbo.agendawatchface.intent.action.refreshplugindata"; // ask plugins for fresh data
+	public static final String INTENT_ACTION_REFRESH_PLUGIN_DATA = "de.janbo.agendawatchface.intent.action.refreshplugindata"; // ask plugins for fresh data,
 	public static final String INTENT_EXTRA_WATCHAPP_VERSION = "de.janbo.agendawatchface.intent.extra.version"; // version of watchface or -1 if unknown
 	public static final String INTENT_EXTRA_WATCHAPP_LAST_SYNC = "de.janbo.agendawatchface.intent.extra.lastsync"; // time since epoch in ms for last successful sync. Or -1
 
@@ -68,7 +68,8 @@ public class AgendaWatchfaceService extends Service {
 	public static final int STATE_SENT_DONE_MSG_WAIT_FOR_ACK = 4; // sent the done message, waiting for the watch to ack
 	public static final int STATE_RESTART_SYNC_ON_ACK = 5; // we were in the middle of a sync, but the watch wants a restart (act on this when receiving the next ack)
 	public static final int STATE_NO_NEW_DATA_MSG_SENT = 6; // we sent COMMAND_NO_NEW_DATA, waiting for ack
-	public static final int STATE_INITIAL_POPULATING_PLUGIN_DATA = 7; // the service is fresh and we don't have recent data available. Waiting for time to pass (some Runnable on a handler will start first sync)
+	public static final int STATE_INITIAL_POPULATING_PLUGIN_DATA = 7; // the service is fresh and we don't have recent data available. Waiting for time to pass (some Runnable on a handler will start
+																		// first sync)
 
 	// Pebble dictionary keys
 	public static final int PEBBLE_KEY_COMMAND = 0; // uint_8
@@ -103,9 +104,9 @@ public class AgendaWatchfaceService extends Service {
 	private List<AgendaItem> itemsSuccessfullySent = null; // last list we sent completely (DONE message). Data corresponds to lastSuccessfulSyncId below
 	private byte lastSuccessfulSyncId = 0; // id that we gave the watchface for the last sync that went through (DONE message) (used for checking for new data) - 0 means "don't know, send anyway!"
 	private byte lastWatchReportedSyncId = 0; // the newest sync id reported by the watch in a request
-	
+
 	private HashMap<String, List<AgendaItem>> pluginData = new HashMap<String, List<AgendaItem>>(); // Maps pluginId -> current list of items
-	
+
 	private BroadcastReceiver ackReceiver = null;
 	private BroadcastReceiver nackReceiver = null;
 
@@ -193,23 +194,23 @@ public class AgendaWatchfaceService extends Service {
 
 		instance = this;
 		handler = new Handler();
-		
+
 		startInitialPluginDataGetting();
 	}
-	
+
 	/**
 	 * Asks plugins for data and syncs watch after some seconds
 	 */
 	protected synchronized void startInitialPluginDataGetting() {
 		state = STATE_INITIAL_POPULATING_PLUGIN_DATA;
-		issueGatherPluginData(); //ask plugins for data
-		handler.postDelayed(new Runnable() { //wait some time, then issue the first sync
-			public void run() {
-				Log.d("AgendaWatchfaceService", "Ending STATE_INITIAL_POPULATING_PLUGIN_DATA, starting watch sync");
-				state = STATE_WAIT_FOR_WATCH_REQUEST;
-				doWatchSyncOnChanges();
-			}
-		}, WAIT_TIME_FOR_PLUGIN_REPORTS);
+		issueGatherPluginData(); // ask plugins for data
+		handler.postDelayed(new Runnable() { // wait some time, then issue the first sync
+					public void run() {
+						Log.d("AgendaWatchfaceService", "Ending STATE_INITIAL_POPULATING_PLUGIN_DATA, starting watch sync");
+						state = STATE_WAIT_FOR_WATCH_REQUEST;
+						sendForceRequestMessage();
+					}
+				}, WAIT_TIME_FOR_PLUGIN_REPORTS);
 	}
 
 	@Override
@@ -268,16 +269,16 @@ public class AgendaWatchfaceService extends Service {
 			return;
 		}
 		if (items == null) {
-			Log.e("AgendaWatchfaceService", "Cannot handle null item list from plugin "+pluginId);
+			Log.e("AgendaWatchfaceService", "Cannot handle null item list from plugin " + pluginId);
 			return;
 		}
-		
-		Log.d("AgendaWatchfaceService", "Successfully received update from "+pluginId);
 
-		if (pluginData.containsKey(pluginId) && items.equals(pluginData.get(pluginId))) { //skip further action if no changes...
+		Log.d("AgendaWatchfaceService", "Successfully received update from " + pluginId);
+
+		if (pluginData.containsKey(pluginId) && items.equals(pluginData.get(pluginId))) { // skip further action if no changes...
 			return;
 		}
-		
+
 		pluginData.put(pluginId, items);
 		doWatchSyncOnChanges();
 	}
@@ -290,6 +291,7 @@ public class AgendaWatchfaceService extends Service {
 	private synchronized void ackReceived(int transactionId) {
 		if (transactionId != transactionFlying) {
 			Log.d("PebbleCommunication", "Received unexpected ack. Ignoring");
+			return;
 		}
 		Log.d("PebbleCommunication", "Received ack in state " + state);
 		switch (state) {
@@ -349,11 +351,11 @@ public class AgendaWatchfaceService extends Service {
 	private synchronized void watchRequestReceived(Long version, Long minVersion, byte reportedSyncId) {
 		Log.d("PebbleCommunication", "Received sync request in state " + state + " for version " + version + ", watch reports having data id " + reportedSyncId);
 		lastWatchReportedSyncId = reportedSyncId;
-		if (state == STATE_INITIAL_POPULATING_PLUGIN_DATA) { //ignore watch request for the time being
+		if (state == STATE_INITIAL_POPULATING_PLUGIN_DATA) { // ignore watch request for the time being
 			Log.d("AgendaWatchfaceService", "Ignoring watch request since we're waiting for initial plugin data");
 			return;
 		}
-		
+
 		if (currentSyncId == 0)
 			currentSyncId = reportedSyncId; // if we have no sync id remembered, just pretend we remember the one the watch reported
 
@@ -385,17 +387,17 @@ public class AgendaWatchfaceService extends Service {
 	 */
 	private void nackReceived(int transactionId) {
 		if (transactionId == transactionFlying) {
-			if (state == STATE_INIT_SENT) {
-				Log.d("PebbleCommunication", "Received Nack for init message. Will not retry");
-				state = STATE_WAIT_FOR_WATCH_REQUEST;
-			} else {
-				Log.d("PebbleCommunication", "Received Nack in state " + state + " resend counter: " + numRetries);
-
-				if (!sendMessage(lastSentDict, true)) {
-					Log.d("PebbleCommunication", "Retries exhausted. Resetting state to begin again");
-					state = STATE_WAIT_FOR_WATCH_REQUEST;
+			Log.d("PebbleCommunication", "Received Nack in state " + state + " resend counter: " + numRetries);
+			final PebbleDictionary dictToResend = lastSentDict;
+			
+			handler.postDelayed(new Runnable() {
+				public void run() {
+					if (dictToResend == lastSentDict && !sendMessage(dictToResend, true)) {
+						Log.d("PebbleCommunication", "Retries exhausted. Resetting state to begin again");
+						state = STATE_WAIT_FOR_WATCH_REQUEST;
+					}
 				}
-			}
+			}, 1000);
 		} else {
 			Log.d("PebbleCommunication", "Received Nack for \"foreign\" transaction");
 		}
@@ -422,18 +424,18 @@ public class AgendaWatchfaceService extends Service {
 
 		dict.addUint32(PEBBLE_KEY_SETTINGS_BOOLFLAGS, flags);
 	}
-	
+
 	/**
 	 * Asks all plugins for content updates. Updates will arrive asynchronously some time later
 	 */
 	private void issueGatherPluginData() {
-		//Send the broadcast to notify everyone
+		// Send the broadcast to notify everyone
 		Intent intent = new Intent(AgendaWatchfacePlugin.INTENT_ACTION_AGENDA_PROVIDER);
 		intent.putExtra(AgendaWatchfacePlugin.INTENT_EXTRA_PROTOCOL_VERSION, AgendaWatchfacePlugin.PLUGIN_PROTOCOL_VERSION);
 		intent.putExtra(AgendaWatchfacePlugin.INTENT_EXTRA_REQUEST_TYPE, AgendaWatchfacePlugin.REQUEST_TYPE_REFRESH);
 		sendBroadcast(intent);
 	}
-	
+
 	/**
 	 * Simply removes all plugin data we know
 	 */
@@ -466,21 +468,22 @@ public class AgendaWatchfaceService extends Service {
 			Log.d("AgendaWatchfaceService", "Almost wanted to start a sync, but we're still in the \"getting plugin data\" phase");
 			return;
 		}
-		
+
 		if (state != STATE_WAIT_FOR_WATCH_REQUEST) {
 			Log.d("PebbleCommunication", "Restarting sending of items");
 		}
-		
+
 		Calendar cal = Calendar.getInstance();
 		long now = cal.getTimeInMillis();
 
 		// Calculate what to send
 		itemsToSend = new ArrayList<AgendaItem>();
-		for (List<AgendaItem> pluginItems : pluginData.values()) // populate list with all plugin items
+		for (List<AgendaItem> pluginItems : pluginData.values())
+			// populate list with all plugin items
 			for (AgendaItem item : pluginItems)
 				if (item != null && item.endTime == null || item.endTime.getTime() > now)
 					itemsToSend.add(item);
-		
+
 		Collections.sort(itemsToSend); // Sort
 		if (itemsToSend.size() > MAX_NUM_ITEMS_TO_SEND) // Trim
 			itemsToSend.subList(MAX_NUM_ITEMS_TO_SEND, itemsToSend.size()).clear();
@@ -548,25 +551,26 @@ public class AgendaWatchfaceService extends Service {
 		data.addInt32(PEBBLE_KEY_ITEM_END_TIME, e.getEndTimeInPebbleFormat());
 		sendMessage(data, false);
 	}
-	
+
 	/**
 	 * Computes the design for the pebble
+	 * 
 	 * @param line
 	 * @param linenum
 	 * @return
 	 */
 	private byte getPebbleDesign(AgendaItem.Line line, int linenum) {
-		byte result = 1; //[sic!] to distinguish between hiding the line and simply all-zero settings
+		byte result = 1; // [sic!] to distinguish between hiding the line and simply all-zero settings
 		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
-		
+
 		if (line.textBold)
 			result |= 0x20;
-		
+
 		TimeDisplayType time_type = line.timeDisplay;
 		if (time_type == null)
-			time_type = TimeDisplayType.values()[Integer.parseInt(prefs.getString("pref_layout_time_"+linenum, linenum == 1 ? "0" : "4"))];
-		result |= time_type.ordinal()*0x02;
-		
+			time_type = TimeDisplayType.values()[Integer.parseInt(prefs.getString("pref_layout_time_" + linenum, linenum == 1 ? "0" : "4"))];
+		result |= time_type.ordinal() * 0x02;
+
 		if (time_type != TimeDisplayType.NONE) {
 			boolean showCountdown = false;
 			if (line.timeShowCountdown != null)
@@ -576,7 +580,7 @@ public class AgendaWatchfaceService extends Service {
 			if (showCountdown)
 				result |= 0x10;
 		}
-		
+
 		return result;
 	}
 
@@ -611,7 +615,9 @@ public class AgendaWatchfaceService extends Service {
 			Log.d("PebbleCommunication", "Stopped retrying message sending in state " + state);
 			return false;
 		}
-
+		if (resend)
+			Log.d("PebbleCommunication", "Resending message. This is retry number "+(numRetries));
+		
 		lastSentDict = data;
 		PebbleKit.sendDataToPebbleWithTransactionId(getApplicationContext(), PEBBLE_APP_UUID, data, transactionFlying);
 		return true;
