@@ -3,21 +3,25 @@ package de.janbo.agendawatchface;
 import java.util.HashSet;
 import java.util.Set;
 
-import de.janbo.agendawatchface.api.AgendaWatchfacePlugin;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.preference.Preference;
 import android.preference.Preference.OnPreferenceClickListener;
 import android.preference.PreferenceCategory;
 import android.preference.PreferenceFragment;
 import android.util.Log;
+import de.janbo.agendawatchface.api.AgendaWatchfacePlugin;
 
 public class SettingsFragment extends PreferenceFragment {
 	protected Set<String> plugins = new HashSet<String>();
 	
+	/**
+	 * The broadcast receiver that listens for plugins announcing their existence
+	 */
 	BroadcastReceiver discoverer = new BroadcastReceiver() {
 		@Override
 		public void onReceive(Context context, Intent intent) {
@@ -53,6 +57,17 @@ public class SettingsFragment extends PreferenceFragment {
 		}
 	};
 	
+	/**
+	 * Listener for preference changes. Will issue the a watch update
+	 */
+	SharedPreferences.OnSharedPreferenceChangeListener listener = new SharedPreferences.OnSharedPreferenceChangeListener() {
+		public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
+			Intent intent = new Intent(getActivity().getApplicationContext(), AgendaWatchfaceService.class);
+			intent.setAction(AgendaWatchfaceService.INTENT_ACTION_FORCE_WATCH_SYNC);			
+			getActivity().startService(intent);
+		}
+	};
+	
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -77,5 +92,17 @@ public class SettingsFragment extends PreferenceFragment {
 		super.onDestroy();
 		
 		getActivity().unregisterReceiver(discoverer);
+	}
+	
+	@Override
+	public void onResume() {
+		super.onResume();
+		getPreferenceManager().getSharedPreferences().registerOnSharedPreferenceChangeListener(listener);
+	}
+
+	@Override
+	public void onPause() {
+		super.onPause();
+		getPreferenceManager().getSharedPreferences().unregisterOnSharedPreferenceChangeListener(listener);
 	}
 }

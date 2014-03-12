@@ -53,7 +53,8 @@ public class AgendaWatchfaceService extends Service {
 	public static final String INTENT_ACTION_WATCHAPP_GIVE_INFO = "de.janbo.agendawatchface.intent.action.givedata"; // answers to requests will be broadcast using this action
 	public static final String INTENT_ACTION_WATCHAPP_REQUEST_INFO = "de.janbo.agendawatchface.intent.action.requestdata"; // request state data from this service
 	public static final String INTENT_ACTION_HANDLE_WATCHAPP_MESSAGE = "de.janbo.agendawatchface.intent.action.handlemessage"; // handle an incoming message from the watch
-	public static final String INTENT_ACTION_REFRESH_PLUGIN_DATA = "de.janbo.agendawatchface.intent.action.refreshplugindata"; // ask plugins for fresh data,
+	public static final String INTENT_ACTION_REFRESH_PLUGIN_DATA = "de.janbo.agendawatchface.intent.action.refreshplugindata"; // ask plugins for fresh data, then sync with watch
+	public static final String INTENT_ACTION_FORCE_WATCH_SYNC = "de.janbo.agendawatchface.intent.action.forcewatchsync"; // begins a sync with the watch, doesn't update plugin data
 	public static final String INTENT_EXTRA_WATCHAPP_VERSION = "de.janbo.agendawatchface.intent.extra.version"; // version of watchface or -1 if unknown
 	public static final String INTENT_EXTRA_WATCHAPP_LAST_SYNC = "de.janbo.agendawatchface.intent.extra.lastsync"; // time since epoch in ms for last successful sync. Or -1
 
@@ -253,6 +254,8 @@ public class AgendaWatchfaceService extends Service {
 			}
 		} else if (intent != null && INTENT_ACTION_REFRESH_PLUGIN_DATA.equals(intent.getAction())) {
 			issueGatherPluginData();
+		} else if (intent != null && INTENT_ACTION_FORCE_WATCH_SYNC.equals(intent.getAction())) {
+			sendForceRequestMessage();
 		} else if (intent != null && state != STATE_INITIAL_POPULATING_PLUGIN_DATA) { // someone wants to simply start the service. Also start a sync
 			Log.d("PebbleCommunication", "onStartService() started forced update");
 			resetPluginData();
@@ -295,7 +298,7 @@ public class AgendaWatchfaceService extends Service {
 		}
 		Log.d("PebbleCommunication", "Received ack in state " + state);
 		switch (state) {
-		case STATE_RESTART_SYNC_ON_ACK:
+		case STATE_RESTART_SYNC_ON_ACK: //TODO recheck if this state is needed
 			forceSync();
 			break;
 		case STATE_WAIT_FOR_WATCH_REQUEST: // we're not expecting an ack
@@ -367,11 +370,12 @@ public class AgendaWatchfaceService extends Service {
 			state = STATE_WAIT_FOR_WATCH_REQUEST;
 		} else {
 			// everything good. Give the watch its data :)
-			if (state == STATE_WAIT_FOR_WATCH_REQUEST || state == STATE_RESTART_SYNC_ON_ACK) // expecting request or watch is very persistent in requesting the restart...
+			if (state == STATE_WAIT_FOR_WATCH_REQUEST) // expecting request or watch is very persistent in requesting the restart...
 				doWatchSyncOnChanges();
 			else {
-				Log.d("PebbleCommunication", "Restart request during sync. Setting state to restart");
-				state = STATE_RESTART_SYNC_ON_ACK; // restart the whole thing when the next ack is received (as kind of a termination of the previous process)
+				Log.d("PebbleCommunication", "Restart request during sync. Restarting");
+				state = STATE_WAIT_FOR_WATCH_REQUEST; // restart the whole thing
+				doWatchSyncOnChanges();
 			}
 		}
 
