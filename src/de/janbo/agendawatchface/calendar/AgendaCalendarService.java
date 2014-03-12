@@ -1,23 +1,58 @@
-package de.janbo.agendawatchface;
+package de.janbo.agendawatchface.calendar;
 
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
+import java.util.TimeZone;
+
+import android.app.Service;
 import android.content.ContentResolver;
 import android.content.ContentUris;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.ContentObserver;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.IBinder;
 import android.preference.PreferenceManager;
 import android.provider.CalendarContract.Calendars;
 import android.provider.CalendarContract.Events;
 import android.provider.CalendarContract.Instances;
+import android.util.Log;
+import de.janbo.agendawatchface.CalendarInstance;
+import de.janbo.agendawatchface.api.AgendaItem;
+import de.janbo.agendawatchface.api.TimeDisplayType;
 
-public class CalendarReader {
-	protected static Uri getContentUri() {
+public class AgendaCalendarService extends Service {	
+	private ContentObserver calendarObserver = new ContentObserver(null) { // content observer looking for calendar changes
+		@Override
+		public void onChange(boolean selfChange) {
+			Log.d("AgendaCalendarService", "Calendar changed (observer fired)");
+			Intent intent = new Intent(getApplicationContext(), AgendaCalendarService.class);
+			startService(intent);
+		}
+	};
+			
+	public void onCreate() {
+		super.onCreate();
+		registerCalendarObserver();
+	}
+	
+	@Override
+	public void onDestroy() {
+		super.onDestroy();
+		unregisterCalendarObserver();
+	}
+	
+	@Override
+	public int onStartCommand(Intent intent, int flags, int startId) {
+		new AgendaCalendarProvider().publishData(this, getEvents(10));
+		return START_STICKY;
+	}
+	
+	protected Uri getContentUri() {
 		Calendar beginTime = Calendar.getInstance();
 		beginTime.add(Calendar.DAY_OF_MONTH, -1);
 		beginTime.set(Calendar.HOUR_OF_DAY, 23);
@@ -43,11 +78,11 @@ public class CalendarReader {
 	 * @param context
 	 * @return
 	 */
-	public static ArrayList<CalendarEvent> getEvents(Context context, int maxNum) {
-		ArrayList<CalendarEvent> events = new ArrayList<CalendarEvent>();
+	protected ArrayList<AgendaItem> getEvents(int maxNum) {
+		ArrayList<AgendaItem> events = new ArrayList<AgendaItem>();
 		
 		Cursor cur = null;
-		ContentResolver cr = context.getContentResolver();
+		ContentResolver cr = getContentResolver();
 		String selection = null;
 		String[] selectionArgs = null;
 		
@@ -56,7 +91,7 @@ public class CalendarReader {
 				Instances.BEGIN + " ASC");
 
 		long now = Calendar.getInstance().getTimeInMillis();
-		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
 		boolean ignoreAllDayEvents = !prefs.getBoolean("pref_show_all_day_events", true);
 		while (cur.moveToNext()) {
 			//Filter all-day-events if set to ignore them
@@ -72,8 +107,33 @@ public class CalendarReader {
 				continue;
 			
 			//Add event to result
-			events.add(new CalendarEvent(cur.getString(cur.getColumnIndex(Instances.TITLE)), cur.getString(cur.getColumnIndex(Instances.EVENT_LOCATION)), new Date(cur.getLong(cur
-					.getColumnIndex(Instances.BEGIN))), new Date(cur.getLong(cur.getColumnIndex(Instances.END))), cur.getInt(cur.getColumnIndex(Instances.ALL_DAY)) != 0));
+			boolean allday = cur.getInt(cur.getColumnIndex(Instances.ALL_DAY)) != 0;
+			String line1textCode = prefs.getString("pref_layout"+(allday ? "_ad" : "")+"_text_1", allday ? "1" : "1");
+			String line2textCode = prefs.getString("pref_layout"+(allday ? "_ad" : "")+"_text_2", allday ? "1" : "1");
+			String line1text = line1textCode.equals("1") ? cur.getString(cur.getColumnIndex(Instances.TITLE)) : cur.getString(cur.getColumnIndex(Instances.EVENT_LOCATION));
+			String line2text = line2textCode.equals("1") ? cur.getString(cur.getColumnIndex(Instances.TITLE)) : cur.getString(cur.getColumnIndex(Instances.EVENT_LOCATION));;
+			
+			AgendaItem item = new AgendaItem(new AgendaCalendarProvider().getPluginId());
+			item.startTime = new Date(cur.getLong(cur.getColumnIndex(Instances.BEGIN)));
+			item.endTime = new Date(cur.getLong(cur.getColumnIndex(Instances.END)));
+			if (cur.getInt(cur.getColumnIndex(Instances.ALL_DAY)) != 0)  //adjust timezone 
+				item.timezone = TimeZone.getTimeZone("UTC");
+			
+			item.line1 = new AgendaItem.Line();
+			item.line1.text = line1text;
+			item.line1.textBold = line1textCode.equals("1");
+			if (allday)
+				item.line1.timeDisplay = TimeDisplayType.NONE;
+			
+			if (allday && prefs.getBoolean("pref_layout_ad_show_row2", false) || !allday && prefs.getBoolean("pref_layout_show_row2", true)) {
+				item.line2 = new AgendaItem.Line();
+				item.line2.text = line2text;
+				item.line2.textBold = line2textCode.equals("1");
+				if (allday)
+					item.line2.timeDisplay = TimeDisplayType.NONE;
+			}
+			
+			events.add(item);
 		}
 		cur.close();
 		
@@ -117,8 +177,8 @@ public class CalendarReader {
 	 * @param context
 	 * @param observer
 	 */
-	public static void registerCalendarObserver(Context context, ContentObserver observer) {
-		context.getContentResolver().registerContentObserver(Events.CONTENT_URI, true, observer);
+	public void registerCalendarObserver() {
+		getContentResolver().registerContentObserver(Events.CONTENT_URI, true, calendarObserver);
 	}
 	
 	/**
@@ -126,7 +186,12 @@ public class CalendarReader {
 	 * @param context
 	 * @param observer
 	 */
-	public static void unregisterCalendarObserver(Context context, ContentObserver observer) {
-		context.getContentResolver().unregisterContentObserver(observer);
+	public void unregisterCalendarObserver() {
+		getContentResolver().unregisterContentObserver(calendarObserver);
+	}
+
+	@Override
+	public IBinder onBind(Intent intent) {
+		return null;
 	}
 }

@@ -23,7 +23,7 @@ public class PebbleDataBroadcastReceiver extends BroadcastReceiver {
 
 		// Pebble-enabled apps are expected to be good citizens and only inspect broadcasts
 		// containing their UUID
-		if (!PebbleCommService.PEBBLE_APP_UUID.equals(receivedUuid)) {
+		if (!AgendaWatchfaceService.PEBBLE_APP_UUID.equals(receivedUuid)) {
 			return;
 		}
 
@@ -34,7 +34,7 @@ public class PebbleDataBroadcastReceiver extends BroadcastReceiver {
 		}
 
 		// Redirect request to the service
-		PebbleCommService.handleReceivedData(context, jsonData, transactionId);
+		AgendaWatchfaceService.handleReceivedData(context, jsonData, transactionId);
 	}
 
 }

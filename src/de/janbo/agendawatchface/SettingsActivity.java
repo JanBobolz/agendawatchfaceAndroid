@@ -19,7 +19,7 @@ public class SettingsActivity extends Activity {
 	protected void onDestroy() {
 		super.onDestroy();
 
-		startService(new Intent(this, PebbleCommService.class)); //kick off update after leaving the activity
+		startService(new Intent(this, AgendaWatchfaceService.class)); //kick off update after leaving the activity
 	}
 
 	@Override
@@ -34,7 +34,7 @@ public class SettingsActivity extends Activity {
 	public boolean onOptionsItemSelected(MenuItem item) {
 		switch (item.getItemId()) {
 		case R.id.menu_apply_settings:
-			startService(new Intent(this, PebbleCommService.class)); //user wants to apply settings, so kick off watch update
+			startService(new Intent(this, AgendaWatchfaceService.class)); //user wants to apply settings, so kick off watch update
 			return true;
 		default:
 		}

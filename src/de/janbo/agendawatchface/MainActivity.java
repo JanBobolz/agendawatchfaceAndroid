@@ -19,30 +19,30 @@ public class MainActivity extends Activity {
 	private BroadcastReceiver serviceInfoReceiver = new BroadcastReceiver() {
 		@Override
 		public void onReceive(Context context, Intent intent) {
-			if (PebbleCommService.INTENT_ACTION_WATCHAPP_GIVE_INFO.equals(intent.getAction())) {
+			if (AgendaWatchfaceService.INTENT_ACTION_WATCHAPP_GIVE_INFO.equals(intent.getAction())) {
 				TextView versionView = (TextView) findViewById(R.id.watchfaceVersionView); 
 				TextView lastSyncView = (TextView) findViewById(R.id.lastSyncView);
 				Button installButton = (Button) findViewById(R.id.updateButton);
 				
-				final int version = intent.getExtras().getInt(PebbleCommService.INTENT_EXTRA_WATCHAPP_VERSION, -1);
-				final long lastSync = intent.getExtras().getLong(PebbleCommService.INTENT_EXTRA_WATCHAPP_LAST_SYNC, -1);
+				final int version = intent.getExtras().getInt(AgendaWatchfaceService.INTENT_EXTRA_WATCHAPP_VERSION, -1);
+				final long lastSync = intent.getExtras().getLong(AgendaWatchfaceService.INTENT_EXTRA_WATCHAPP_LAST_SYNC, -1);
 				
 				//Set text views
 				versionView.setText("Installed watchapp: "+(version == -1 ? "?" : 
-					version >= PebbleCommService.CURRENT_WATCHAPP_VERSION_BUNDLED ? "up-to-date" : "outdated"));
+					version >= AgendaWatchfaceService.CURRENT_WATCHAPP_VERSION_BUNDLED ? "up-to-date" : "outdated"));
 				lastSyncView.setText("Last sync: "+(lastSync == -1 ? "?" : DateUtils.getRelativeTimeSpanString(MainActivity.this, lastSync)));
 				
 				//Set button
 				installButton.setText(version == -1 && lastSync == -1 ? "Install watchapp" : //no indication that it's installed
 					version == -1 ? "(Re-)install watchapp" : //last sync != -1 => it's installed, but version unknown
-					version > PebbleCommService.CURRENT_WATCHAPP_VERSION_BUNDLED ? "Update android app" :
-					version < PebbleCommService.CURRENT_WATCHAPP_VERSION_BUNDLED ? "Update watchapp" :
+					version > AgendaWatchfaceService.CURRENT_WATCHAPP_VERSION_BUNDLED ? "Update android app" :
+					version < AgendaWatchfaceService.CURRENT_WATCHAPP_VERSION_BUNDLED ? "Update watchapp" :
 					"Reinstall watchapp"); //in this case version == CURRENT_BUNDLED
-				installButton.setVisibility(version == PebbleCommService.CURRENT_WATCHAPP_VERSION_BUNDLED ? View.GONE : View.VISIBLE);
+				installButton.setVisibility(version == AgendaWatchfaceService.CURRENT_WATCHAPP_VERSION_BUNDLED ? View.GONE : View.VISIBLE);
 				installButton.setOnClickListener(new OnClickListener() {
 					@Override
 					public void onClick(View v) {
-						if (version == -1 || version <= PebbleCommService.CURRENT_WATCHAPP_VERSION_BUNDLED) //send app to watch
+						if (version == -1 || version <= AgendaWatchfaceService.CURRENT_WATCHAPP_VERSION_BUNDLED) //send app to watch
 							WatchappHandler.install(MainActivity.this);
 						else { //offer updating this app
 							Intent intent;
@@ -64,8 +64,8 @@ public class MainActivity extends Activity {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
 
-		PebbleCommService.startWatchapp(getApplicationContext());
-		startService(new Intent(MainActivity.this, PebbleCommService.class)); //kick off sync/start service
+		AgendaWatchfaceService.startWatchapp(getApplicationContext());
+		startService(new Intent(MainActivity.this, AgendaWatchfaceService.class)); //kick off sync/start service
 	}
 
 	@Override
@@ -74,11 +74,11 @@ public class MainActivity extends Activity {
 		
 		//Register for info from the service
 		IntentFilter filter = new IntentFilter();
-		filter.addAction(PebbleCommService.INTENT_ACTION_WATCHAPP_GIVE_INFO);
+		filter.addAction(AgendaWatchfaceService.INTENT_ACTION_WATCHAPP_GIVE_INFO);
 		registerReceiver(serviceInfoReceiver, filter);
 		
 		//Ask service for news
-		Intent intent = new Intent(PebbleCommService.INTENT_ACTION_WATCHAPP_REQUEST_INFO);
+		Intent intent = new Intent(AgendaWatchfaceService.INTENT_ACTION_WATCHAPP_REQUEST_INFO);
 		sendBroadcast(intent);
 	}
 	

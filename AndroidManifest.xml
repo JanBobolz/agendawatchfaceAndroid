@@ -10,7 +10,7 @@
 
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 
     <application
         android:allowBackup="true"
@@ -28,8 +28,11 @@
         </activity>
 
         <service
-            android:name="PebbleCommService"
-            android:label="Pebble Communication Service" android:stopWithTask="false">
+            android:name="AgendaWatchfaceService"
+            android:label="Main Service for the Watchface"
+            android:stopWithTask="false" ><intent-filter>
+                <action android:name="de.janbo.agendawatchface.intent.action.acceptdata"/>
+            </intent-filter>
         </service>
 
         <receiver
@@ -37,19 +40,34 @@
             android:label="Autostarts the service" >
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
-        <activity android:name="SettingsActivity"></activity>
-        <activity android:name="WatchappUpdateActivity"></activity>
-        <receiver android:name="PebbleDataBroadcastReceiver">
+
+        <activity android:name="SettingsActivity" >
+        </activity>
+        <activity android:name="WatchappUpdateActivity" >
+        </activity>
+
+        <receiver android:name="PebbleDataBroadcastReceiver" >
             <intent-filter>
-                <action android:name="com.getpebble.action.app.RECEIVE"/>
+                <action android:name="com.getpebble.action.app.RECEIVE" />
             </intent-filter>
         </receiver>
+
+        <service android:name="de.janbo.agendawatchface.calendar.AgendaCalendarService" >
+        </service>
+
+        <receiver android:name="de.janbo.agendawatchface.calendar.AgendaCalendarProvider" >
+            <intent-filter>
+                <action android:name="de.janbo.agendawatchface.intent.action.provider"/>
+            </intent-filter>
+        </receiver>
+        <activity android:name="de.janbo.agendawatchface.calendar.AgendaCalendarSettingsActivity"></activity>
     </application>
 
 </manifest>

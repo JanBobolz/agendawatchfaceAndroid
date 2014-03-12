@@ -1,5 +1,9 @@
 package de.janbo.agendawatchface;
 
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 
@@ -10,6 +14,10 @@ import com.getpebble.android.kit.PebbleKit.PebbleAckReceiver;
 import com.getpebble.android.kit.PebbleKit.PebbleNackReceiver;
 import com.getpebble.android.kit.util.PebbleDictionary;
 
+import de.janbo.agendawatchface.api.AgendaItem;
+import de.janbo.agendawatchface.api.AgendaWatchfacePlugin;
+import de.janbo.agendawatchface.api.TimeDisplayType;
+
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
@@ -18,74 +26,86 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
-import android.database.ContentObserver;
 import android.net.Uri;
+import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Parcelable;
 import android.preference.PreferenceManager;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 
 /**
- * Service that handles communication with the watch.
+ * Service that handles aggregation of items and communication with the watch.
  * 
  * @author Jan
  */
-public class PebbleCommService extends Service {
+public class AgendaWatchfaceService extends Service {
 	public static final UUID PEBBLE_APP_UUID = UUID.fromString("1f366804-f1d2-4288-b71a-708661777887");
 	public static final byte CURRENT_WATCHAPP_VERSION_BUNDLED = 7; // bundled watchapp version
 	public static final byte CURRENT_WATCHAPP_VERSION_MINIMUM = 7; // smallest version of watchapp that is still supported
 
-	public static final int MAX_NUM_EVENTS_TO_SEND = 10; // should correspond to number of items saved in the watch database
+	public static final int MAX_NUM_ITEMS_TO_SEND = 10; // should correspond to number of items saved in the watch database
+	public static final long WAIT_TIME_FOR_PLUGIN_REPORTS =  2*1000; //maximum time to wait with first sync before all plugins report (in ms)
+	public static final int PLUGIN_SYNC_INTERVAL = 30; //interval to get new data from plugins (in minutes)
 
 	// Android app internals
 	public static final String INTENT_ACTION_WATCHAPP_GIVE_INFO = "de.janbo.agendawatchface.intent.action.givedata"; // answers to requests will be broadcast using this action
 	public static final String INTENT_ACTION_WATCHAPP_REQUEST_INFO = "de.janbo.agendawatchface.intent.action.requestdata"; // request state data from this service
 	public static final String INTENT_ACTION_HANDLE_WATCHAPP_MESSAGE = "de.janbo.agendawatchface.intent.action.handlemessage"; // handle an incoming message from the watch
+	public static final String INTENT_ACTION_REFRESH_PLUGIN_DATA = "de.janbo.agendawatchface.intent.action.refreshplugindata"; // ask plugins for fresh data
 	public static final String INTENT_EXTRA_WATCHAPP_VERSION = "de.janbo.agendawatchface.intent.extra.version"; // version of watchface or -1 if unknown
 	public static final String INTENT_EXTRA_WATCHAPP_LAST_SYNC = "de.janbo.agendawatchface.intent.extra.lastsync"; // time since epoch in ms for last successful sync. Or -1
+
+	// Intents for communication with plugins
+	public static final String INTENT_ACTION_ACCEPT_DATA = "de.janbo.agendawatchface.intent.action.acceptdata";
+	public static final String INTENT_ACTION_ACCEPT_DISCOVER = "de.janbo.agendawatchface.intent.action.acceptdiscovery";
 
 	// Protocol states
 	public static final int STATE_WAIT_FOR_WATCH_REQUEST = 0; // Nothing happening
 	public static final int STATE_INIT_SENT = 1; // First message (COMMAND_INIT_DATA) sent, waiting for ack
-	public static final int STATE_SENT_EVENT_WAIT_FOR_ACK = 2; // sent first half of event, waiting for the watch to ack
-	public static final int STATE_SENT_EVENT_TIME_WAIT_FOR_ACK = 3; // sent second half, waiting...
+	public static final int STATE_SENT_ITEM_WAIT_FOR_ACK = 2; // sent item, waiting for the watch to ack
 	public static final int STATE_SENT_DONE_MSG_WAIT_FOR_ACK = 4; // sent the done message, waiting for the watch to ack
-	public static final int STATE_WATCH_REQUESTED_RESTART = 5; // we were in the middle of a sync, but the watch wants a restart (act on this when receiving the next ack)
+	public static final int STATE_RESTART_SYNC_ON_ACK = 5; // we were in the middle of a sync, but the watch wants a restart (act on this when receiving the next ack)
 	public static final int STATE_NO_NEW_DATA_MSG_SENT = 6; // we sent COMMAND_NO_NEW_DATA, waiting for ack
+	public static final int STATE_INITIAL_POPULATING_PLUGIN_DATA = 7; // the service is fresh and we don't have recent data available. Waiting for time to pass (some Runnable on a handler will start first sync)
 
 	// Pebble dictionary keys
 	public static final int PEBBLE_KEY_COMMAND = 0; // uint_8
 	public static final int PEBBLE_KEY_VERSION = 1; // uint_8, minimal watchapp version for syncing
 	public static final int PEBBLE_KEY_SYNC_ID = 2; // uint_8, id for this particular sync
-	public static final int PEBBLE_KEY_NUM_EVENTS = 10; // uint_8
-	public static final int PEBBLE_KEY_CAL_TITLE = 1; // String
-	public static final int PEBBLE_KEY_CAL_LOC = 2; // String
-	public static final int PEBBLE_KEY_CAL_START_TIME = 20; // int_32, in format: minutes + 60*hours + 60*24*weekday + 60*24*7*dayOfMonth + 60*24*7*32*(month-1) + 60*24*7*32*12*(year-1900)
-	public static final int PEBBLE_KEY_CAL_END_TIME = 30; // int_32
-	public static final int PEBBLE_KEY_CAL_ALLDAY = 5; // uint_8
+	public static final int PEBBLE_KEY_NUM_ITEMS = 10; // uint_8
+	public static final int PEBBLE_KEY_ITEM_TEXT1 = 1; // String
+	public static final int PEBBLE_KEY_ITEM_TEXT2 = 2; // String
+	public static final int PEBBLE_KEY_ITEM_DESIGN1 = 3; // uint_8, format: 0 if row hidden. 0x02-0x08 TimeDisplayType, 0x10 countdown on/off, 0x12 bold text on/off
+	public static final int PEBBLE_KEY_ITEM_DESIGN2 = 4; // uint_8, format like DESIGN1
+	public static final int PEBBLE_KEY_ITEM_START_TIME = 20; // int_32, in format: minutes + 60*hours + 60*24*weekday + 60*24*7*dayOfMonth + 60*24*7*32*(month-1) + 60*24*7*32*12*(year-1900). Or 0 to
+																// simply show "today"
+	public static final int PEBBLE_KEY_ITEM_END_TIME = 30; // int_32 or 0 to make it never end
 	public static final int PEBBLE_KEY_SETTINGS_BOOLFLAGS = 40; // uint_32
-	public static final int PEBBLE_KEY_SETTINGS_DESIGN = 41; // uint_32
 
 	public static final int PEBBLE_TO_PHONE_KEY_VERSION = 0; // current version of the watchface
 	public static final int PEBBLE_TO_PHONE_KEY_VERSIONBACKWARD = 1; // version of bundled firmware that this app must have to support the watchface version
 	public static final int PEBBLE_TO_PHONE_KEY_LAST_SYNC_ID = 2; // id of the last sync that went through correctly according to watch (0 to force)
 
 	// Pebble commands
-	public static final byte PEBBLE_COMMAND_CAL_EVENT = 1;
-	public static final byte PEBBLE_COMMAND_CAL_EVENT_TIME = 3;
+	public static final byte PEBBLE_COMMAND_ITEM = 1;
 	public static final byte PEBBLE_COMMAND_INIT_DATA = 0;
 	public static final byte PEBBLE_COMMAND_DONE = 2;
 	public static final byte PEBBLE_COMMAND_NO_NEW_DATA = 4;
-	public static final byte PEBBLE_COMMAND_FORCE_REQUEST = 5; //requests the watch to send a request (to update version, etc.)
+	public static final byte PEBBLE_COMMAND_FORCE_REQUEST = 5; // requests the watch to send a request (to update version, etc.)
 
 	// Variables
-	private int state = STATE_WAIT_FOR_WATCH_REQUEST;
+	private int state = STATE_INITIAL_POPULATING_PLUGIN_DATA;
 	private int currentIndex = -1; // index that is currently sent
-	private List<CalendarEvent> eventsToSend = null; // data we're currently sending to the watch
-	private byte currentSyncId = 0; //id of the current sync process (incremented for each new COMMAND_INIT_DATA)
-	private List<CalendarEvent> eventsSuccessfullySent = null; //last list we sent completely (DONE message). Data corresponds to lastSuccessfulSyncId below
-	private byte lastSuccessfulSyncId = 0; //id that we gave the watchface for the last sync that went through (DONE message) (used for checking for new data) - 0 means "don't know, send anyway!"
-
+	private List<AgendaItem> itemsToSend = null; // data we're currently sending to the watch
+	private byte currentSyncId = 0; // id of the current sync process (incremented for each new COMMAND_INIT_DATA)
+	private List<AgendaItem> itemsSuccessfullySent = null; // last list we sent completely (DONE message). Data corresponds to lastSuccessfulSyncId below
+	private byte lastSuccessfulSyncId = 0; // id that we gave the watchface for the last sync that went through (DONE message) (used for checking for new data) - 0 means "don't know, send anyway!"
+	private byte lastWatchReportedSyncId = 0; // the newest sync id reported by the watch in a request
+	
+	private HashMap<String, List<AgendaItem>> pluginData = new HashMap<String, List<AgendaItem>>(); // Maps pluginId -> current list of items
+	
 	private BroadcastReceiver ackReceiver = null;
 	private BroadcastReceiver nackReceiver = null;
 
@@ -97,16 +117,8 @@ public class PebbleCommService extends Service {
 	private int watchfaceVersion = -1; // last version the watchface reported
 	private long lastSync = -1; // time since epoch in ms where last sync went through
 
-	private static PebbleCommService instance = null; // static reference to the service
-
-	private ContentObserver calendarObserver = new ContentObserver(null) { // content observer looking for calendar changes
-		@Override
-		public void onChange(boolean selfChange) {
-			Log.d("PebbleCommunication", "Calendar changed (observer fired)");
-			if (state == STATE_WAIT_FOR_WATCH_REQUEST)
-				beginSendingData(lastSuccessfulSyncId);
-		}
-	};
+	private static AgendaWatchfaceService instance = null; // static reference to the service
+	private Handler handler = null;
 
 	private BroadcastReceiver infoRequestReceiver = new BroadcastReceiver() {
 		@Override
@@ -135,7 +147,7 @@ public class PebbleCommService extends Service {
 		// Relay message to the service
 		if (instance == null)
 			Log.d("PebbleCommunication", "Reviving service because of incoming Pebble message");
-		Intent intent = new Intent(context, PebbleCommService.class);
+		Intent intent = new Intent(context, AgendaWatchfaceService.class);
 		intent.setAction(INTENT_ACTION_HANDLE_WATCHAPP_MESSAGE);
 		intent.putExtra(com.getpebble.android.kit.Constants.MSG_DATA, msgData);
 		context.startService(intent);
@@ -146,8 +158,9 @@ public class PebbleCommService extends Service {
 	 * 
 	 * @param dict
 	 */
-	private void handleReceivedDataInternal(PebbleDictionary data) {
-		requestReceived(data.getInteger(PEBBLE_TO_PHONE_KEY_VERSION), data.contains(PEBBLE_TO_PHONE_KEY_VERSIONBACKWARD) ? data.getInteger(PEBBLE_TO_PHONE_KEY_VERSIONBACKWARD) : 4, data.contains(PEBBLE_TO_PHONE_KEY_LAST_SYNC_ID) ? data.getUnsignedInteger(PEBBLE_TO_PHONE_KEY_LAST_SYNC_ID).byteValue() : (byte) 0);
+	private void handleReceivedWatchDataInternal(PebbleDictionary data) {
+		watchRequestReceived(data.getInteger(PEBBLE_TO_PHONE_KEY_VERSION), data.contains(PEBBLE_TO_PHONE_KEY_VERSIONBACKWARD) ? data.getInteger(PEBBLE_TO_PHONE_KEY_VERSIONBACKWARD) : 4,
+				data.contains(PEBBLE_TO_PHONE_KEY_LAST_SYNC_ID) ? data.getUnsignedInteger(PEBBLE_TO_PHONE_KEY_LAST_SYNC_ID).byteValue() : (byte) 0);
 	}
 
 	@Override
@@ -155,7 +168,7 @@ public class PebbleCommService extends Service {
 		super.onCreate();
 
 		Log.d("PebbleCommunication", "Service created");
-		
+
 		watchfaceVersion = PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).getInt("last_reported_watchface_version", -1);
 
 		// Register receivers
@@ -173,15 +186,30 @@ public class PebbleCommService extends Service {
 			}
 		});
 
-		// Register for calendar changes
-		CalendarReader.registerCalendarObserver(this, calendarObserver);
-
 		// Register for info requests
 		IntentFilter filter = new IntentFilter();
-		filter.addAction(PebbleCommService.INTENT_ACTION_WATCHAPP_REQUEST_INFO);
+		filter.addAction(AgendaWatchfaceService.INTENT_ACTION_WATCHAPP_REQUEST_INFO);
 		registerReceiver(infoRequestReceiver, filter);
 
 		instance = this;
+		handler = new Handler();
+		
+		startInitialPluginDataGetting();
+	}
+	
+	/**
+	 * Asks plugins for data and syncs watch after some seconds
+	 */
+	protected synchronized void startInitialPluginDataGetting() {
+		state = STATE_INITIAL_POPULATING_PLUGIN_DATA;
+		issueGatherPluginData(); //ask plugins for data
+		handler.postDelayed(new Runnable() { //wait some time, then issue the first sync
+			public void run() {
+				Log.d("AgendaWatchfaceService", "Ending STATE_INITIAL_POPULATING_PLUGIN_DATA, starting watch sync");
+				state = STATE_WAIT_FOR_WATCH_REQUEST;
+				doWatchSyncOnChanges();
+			}
+		}, WAIT_TIME_FOR_PLUGIN_REPORTS);
 	}
 
 	@Override
@@ -193,27 +221,65 @@ public class PebbleCommService extends Service {
 		if (nackReceiver != null)
 			unregisterReceiver(nackReceiver);
 
-		CalendarReader.unregisterCalendarObserver(this, calendarObserver);
-
 		instance = null;
+		handler = null;
 		PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).edit().putInt("last_reported_watchface_version", watchfaceVersion).commit();
 	}
 
 	@Override
-	public int onStartCommand(Intent intent, int flags, int startId) {
+	public synchronized int onStartCommand(Intent intent, int flags, int startId) {
 		if (intent != null && INTENT_ACTION_HANDLE_WATCHAPP_MESSAGE.equals(intent.getAction())) { // handle the watch's request
 			Log.d("PebbleCommunication", "handling watch message");
 			try {
-				handleReceivedDataInternal(PebbleDictionary.fromJson(intent.getStringExtra(com.getpebble.android.kit.Constants.MSG_DATA)));
+				handleReceivedWatchDataInternal(PebbleDictionary.fromJson(intent.getStringExtra(com.getpebble.android.kit.Constants.MSG_DATA)));
 			} catch (JSONException e) {
 				Log.e("PebbleCommunication", "Error parsing json", e);
 			}
-		} else if (intent != null) { // someone wants to simply start the service. Also start a sync
+		} else if (intent != null && AgendaWatchfacePlugin.MAIN_SERVICE_INTENT_ACTION_ACCEPT_DATA.equals(intent.getAction())) { // handle plugin giving us data
+			if (intent.getIntExtra(AgendaWatchfacePlugin.MAIN_SERVICE_INTENT_EXTRA_PLUGIN_VERSION, -1) != AgendaWatchfacePlugin.PLUGIN_PROTOCOL_VERSION)
+				Log.e("AgendaWatchfaceService", "Plugin " + intent.getStringExtra(AgendaWatchfacePlugin.MAIN_SERVICE_INTENT_EXTRA_PLUGIN_ID)
+						+ " seems outdated (or didn't supply version). Ignoring its data");
+			else {
+				Parcelable[] data = intent.getParcelableArrayExtra(AgendaWatchfacePlugin.MAIN_SERVICE_INTENT_EXTRA_DATA);
+				ArrayList<AgendaItem> items = new ArrayList<AgendaItem>();
+				try {
+					for (Parcelable item : data)
+						items.add(new AgendaItem((Bundle) item));
+				} catch (RuntimeException e) {
+					Log.e("AgendaWatchfaceService", "Plugin supplied invalid data", e);
+				}
+				handleReceivedPluginData(items, intent.getStringExtra(AgendaWatchfacePlugin.MAIN_SERVICE_INTENT_EXTRA_PLUGIN_ID));
+			}
+		} else if (intent != null && INTENT_ACTION_REFRESH_PLUGIN_DATA.equals(intent.getAction())) {
+			issueGatherPluginData();
+		} else if (intent != null && state != STATE_INITIAL_POPULATING_PLUGIN_DATA) { // someone wants to simply start the service. Also start a sync
 			Log.d("PebbleCommunication", "onStartService() started forced update");
+			resetPluginData();
+			startInitialPluginDataGetting();
 			sendForceRequestMessage();
 		}
 
 		return START_STICKY; // we want the service to persist
+	}
+
+	private void handleReceivedPluginData(List<AgendaItem> items, String pluginId) {
+		if (pluginId == null) {
+			Log.e("AgendaWatchfaceService", "No plugin id supplied");
+			return;
+		}
+		if (items == null) {
+			Log.e("AgendaWatchfaceService", "Cannot handle null item list from plugin "+pluginId);
+			return;
+		}
+		
+		Log.d("AgendaWatchfaceService", "Successfully received update from "+pluginId);
+
+		if (pluginData.containsKey(pluginId) && items.equals(pluginData.get(pluginId))) { //skip further action if no changes...
+			return;
+		}
+		
+		pluginData.put(pluginId, items);
+		doWatchSyncOnChanges();
 	}
 
 	/**
@@ -227,36 +293,31 @@ public class PebbleCommService extends Service {
 		}
 		Log.d("PebbleCommunication", "Received ack in state " + state);
 		switch (state) {
-		case STATE_WATCH_REQUESTED_RESTART:
-			beginSendingData();
+		case STATE_RESTART_SYNC_ON_ACK:
+			forceSync();
 			break;
 		case STATE_WAIT_FOR_WATCH_REQUEST: // we're not expecting an ack
 			break;
 		case STATE_NO_NEW_DATA_MSG_SENT:
 			state = STATE_WAIT_FOR_WATCH_REQUEST;
 			break;
-		case STATE_INIT_SENT: // message ack'd was the initial one. Start sending events
+		case STATE_INIT_SENT: // message ack'd was the initial one. Start sending items
 			currentIndex = 0;
-			if (eventsToSend.size() == 0) { // nothing to do if no events to show
+			if (itemsToSend.size() == 0) { // nothing to do if no items to show
 				state = STATE_WAIT_FOR_WATCH_REQUEST;
 				break;
 			}
 
-			// Begin sending first event
-			sendFirstEventHalf(eventsToSend.get(currentIndex));
-			state = STATE_SENT_EVENT_WAIT_FOR_ACK;
+			// Begin sending first item
+			sendItem(itemsToSend.get(currentIndex));
+			state = STATE_SENT_ITEM_WAIT_FOR_ACK;
 			break;
 
-		case STATE_SENT_EVENT_WAIT_FOR_ACK: // ack was for first event half. Send second half.
-			sendSecondEventHalf(eventsToSend.get(currentIndex));
-			state = STATE_SENT_EVENT_TIME_WAIT_FOR_ACK;
-			break;
-
-		case STATE_SENT_EVENT_TIME_WAIT_FOR_ACK: // ack was for second event half. Send next event
+		case STATE_SENT_ITEM_WAIT_FOR_ACK: // ack was for item. Send next item
 			currentIndex++;
-			if (currentIndex < eventsToSend.size() && currentIndex < MAX_NUM_EVENTS_TO_SEND) { // still things to send
-				sendFirstEventHalf(eventsToSend.get(currentIndex));
-				state = STATE_SENT_EVENT_WAIT_FOR_ACK;
+			if (currentIndex < itemsToSend.size() && currentIndex < MAX_NUM_ITEMS_TO_SEND) { // still things to send
+				sendItem(itemsToSend.get(currentIndex));
+				state = STATE_SENT_ITEM_WAIT_FOR_ACK;
 			} else {
 				sendDoneMessage();
 				state = STATE_SENT_DONE_MSG_WAIT_FOR_ACK;
@@ -268,8 +329,8 @@ public class PebbleCommService extends Service {
 			Log.d("PebbleCommunication", "Sync complete :)");
 			lastSync = System.currentTimeMillis();
 			lastSuccessfulSyncId = currentSyncId;
-			eventsSuccessfullySent = eventsToSend;
-			
+			itemsSuccessfullySent = itemsToSend;
+
 			broadcastCurrentData();
 			break;
 		}
@@ -283,14 +344,19 @@ public class PebbleCommService extends Service {
 	 * @param minVersion
 	 *            version the watchface expects of this app (bundled watchface version)
 	 * @param reportedSyncId
-	 * 			  id the watch reports that its synced data has
+	 *            id the watch reports that its synced data has
 	 */
-	private synchronized void requestReceived(Long version, Long minVersion, byte reportedSyncId) {
-		Log.d("PebbleCommunication", "Received sync request in state " + state + " for version " + version +", watch reports having data id "+reportedSyncId);
+	private synchronized void watchRequestReceived(Long version, Long minVersion, byte reportedSyncId) {
+		Log.d("PebbleCommunication", "Received sync request in state " + state + " for version " + version + ", watch reports having data id " + reportedSyncId);
+		lastWatchReportedSyncId = reportedSyncId;
+		if (state == STATE_INITIAL_POPULATING_PLUGIN_DATA) { //ignore watch request for the time being
+			Log.d("AgendaWatchfaceService", "Ignoring watch request since we're waiting for initial plugin data");
+			return;
+		}
 		
 		if (currentSyncId == 0)
-			currentSyncId = reportedSyncId; //if we have no sync id remembered, just pretend we remember the one the watch reported
-		
+			currentSyncId = reportedSyncId; // if we have no sync id remembered, just pretend we remember the one the watch reported
+
 		if (minVersion == null || minVersion > CURRENT_WATCHAPP_VERSION_BUNDLED) { // watchface expects newer Android app
 			triggerAndroidAppUpdateNotification();
 			state = STATE_WAIT_FOR_WATCH_REQUEST;
@@ -299,11 +365,11 @@ public class PebbleCommService extends Service {
 			state = STATE_WAIT_FOR_WATCH_REQUEST;
 		} else {
 			// everything good. Give the watch its data :)
-			if (state == STATE_WAIT_FOR_WATCH_REQUEST || state == STATE_WATCH_REQUESTED_RESTART) //expecting request or watch is very persistent in requesting the restart...
-				beginSendingData(reportedSyncId);
+			if (state == STATE_WAIT_FOR_WATCH_REQUEST || state == STATE_RESTART_SYNC_ON_ACK) // expecting request or watch is very persistent in requesting the restart...
+				doWatchSyncOnChanges();
 			else {
 				Log.d("PebbleCommunication", "Restart request during sync. Setting state to restart");
-				state = STATE_WATCH_REQUESTED_RESTART; //restart the whole thing when the next ack is received (as kind of a termination of the previous process)
+				state = STATE_RESTART_SYNC_ON_ACK; // restart the whole thing when the next ack is received (as kind of a termination of the previous process)
 			}
 		}
 
@@ -348,73 +414,96 @@ public class PebbleCommService extends Service {
 		flags |= prefs.getBoolean("pref_show_header", true) ? 0x01 : 0; // constants are documented in the watchapp
 		flags |= prefs.getBoolean("pref_12h", false) ? 0x02 : 0;
 		flags |= prefs.getBoolean("pref_ampm", true) ? 0x04 : 0;
-		flags |= prefs.getBoolean("pref_layout_show_row2", true) ? 0x08 : 0;
-		flags |= prefs.getBoolean("pref_layout_ad_show_row2", false) ? 0x10 : 0;
 		flags |= Integer.parseInt(prefs.getString("pref_layout_font_size", "0")) % 2 == 1 ? 0x20 : 0;
 		flags |= Integer.parseInt(prefs.getString("pref_layout_font_size", "0")) > 1 ? 0x40 : 0;
 		flags |= Integer.parseInt(prefs.getString("pref_header_time_size", "0")) % 2 == 1 ? 0x80 : 0;
 		flags |= Integer.parseInt(prefs.getString("pref_header_time_size", "0")) > 1 ? 0x100 : 0;
 		flags |= prefs.getBoolean("pref_separator_date", false) ? 0x200 : 0;
-		flags |= prefs.getBoolean("pref_layout_countdown", false) ? 0x400 : 0;
 
 		dict.addUint32(PEBBLE_KEY_SETTINGS_BOOLFLAGS, flags);
-
-		// Design settings
-		int design = 0; // first 4 bits: time settings (first row), then 4 bits text settings (first row), then 4 bits time settings (2nd row), then 4 bits text settings (2nd row). Then the same again
-						// for all-day events
-		design |= Integer.parseInt(prefs.getString("pref_layout_time_1", "0")); // check values/strings.xml for value meanings
-		design |= Integer.parseInt(prefs.getString("pref_layout_text_1", "1")) * 0x10;
-		design |= Integer.parseInt(prefs.getString("pref_layout_time_2", "4")) * 0x100;
-		design |= Integer.parseInt(prefs.getString("pref_layout_text_2", "2")) * 0x1000;
-		design |= Integer.parseInt(prefs.getString("pref_layout_ad_text_1", "1")) * 0x100000;
-		design |= Integer.parseInt(prefs.getString("pref_layout_ad_text_2", "2")) * 0x10000000;
-
-		dict.addUint32(PEBBLE_KEY_SETTINGS_DESIGN, design);
-	}
-
-	/**
-	 * Kicks off (forced) sync process by reading calendar data and sending init message
-	 */
-	private synchronized void beginSendingData() {
-		beginSendingData((byte) 0);
 	}
 	
 	/**
-	 * Kicks off sync process by reading calendar data, checking whether it contains new data, and sending init message or noNewData message
-	 * @param reportedSyncId id that the watch reported that it has (or 0 to force sync)
+	 * Asks all plugins for content updates. Updates will arrive asynchronously some time later
 	 */
-	private synchronized void beginSendingData(byte reportedSyncId) {
+	private void issueGatherPluginData() {
+		//Send the broadcast to notify everyone
+		Intent intent = new Intent(AgendaWatchfacePlugin.INTENT_ACTION_AGENDA_PROVIDER);
+		intent.putExtra(AgendaWatchfacePlugin.INTENT_EXTRA_PROTOCOL_VERSION, AgendaWatchfacePlugin.PLUGIN_PROTOCOL_VERSION);
+		intent.putExtra(AgendaWatchfacePlugin.INTENT_EXTRA_REQUEST_TYPE, AgendaWatchfacePlugin.REQUEST_TYPE_REFRESH);
+		sendBroadcast(intent);
+	}
+	
+	/**
+	 * Simply removes all plugin data we know
+	 */
+	private void resetPluginData() {
+		pluginData.clear();
+	}
+
+	/**
+	 * Kicks of a forced sync (giving the watch a complete dataset)
+	 */
+	private synchronized void forceSync() {
+		beginWatchSync((byte) 0);
+	}
+
+	/**
+	 * Checks if there are any changes in the current data and kicks of a sync iff this is the case
+	 */
+	private synchronized void doWatchSyncOnChanges() {
+		beginWatchSync(lastWatchReportedSyncId);
+	}
+
+	/**
+	 * Kicks off sync process by checking whether we have new data, and sending init message or noNewData message
+	 * 
+	 * @param reportedSyncId
+	 *            id that the watch reported that it has (or 0 to force sync).
+	 */
+	private synchronized void beginWatchSync(byte reportedSyncId) {
+		if (state == STATE_INITIAL_POPULATING_PLUGIN_DATA) {
+			Log.d("AgendaWatchfaceService", "Almost wanted to start a sync, but we're still in the \"getting plugin data\" phase");
+			return;
+		}
+		
 		if (state != STATE_WAIT_FOR_WATCH_REQUEST) {
-			Log.d("PebbleCommunication", "Restarting sending of events");
+			Log.d("PebbleCommunication", "Restarting sending of items");
+		}
+		
+		Calendar cal = Calendar.getInstance();
+		long now = cal.getTimeInMillis();
+
+		// Calculate what to send
+		itemsToSend = new ArrayList<AgendaItem>();
+		for (List<AgendaItem> pluginItems : pluginData.values()) // populate list with all plugin items
+			for (AgendaItem item : pluginItems)
+				if (item != null && item.endTime == null || item.endTime.getTime() > now)
+					itemsToSend.add(item);
+		
+		Collections.sort(itemsToSend); // Sort
+		if (itemsToSend.size() > MAX_NUM_ITEMS_TO_SEND) // Trim
+			itemsToSend.subList(MAX_NUM_ITEMS_TO_SEND, itemsToSend.size()).clear();
+
+		currentIndex = -1;
+
+		// Check if we should report this data having been sent before
+		boolean newData = true;
+		if (itemsSuccessfullySent != null && lastSuccessfulSyncId != 0 && reportedSyncId == lastSuccessfulSyncId) { // if so, Compare the version we're about to send to the last successful one
+			newData = !itemsSuccessfullySent.equals(itemsToSend);
 		}
 
-		eventsToSend = CalendarReader.getEvents(getApplicationContext(), MAX_NUM_EVENTS_TO_SEND);
-		currentIndex = -1;
-		
-		//Check if we should report this data having been sent before
-		boolean newData = true;
-		if (eventsSuccessfullySent != null && lastSuccessfulSyncId != 0 && reportedSyncId == lastSuccessfulSyncId) { //if so, Compare the version we're about to send to the last successful one
-			if (eventsSuccessfullySent.size() == eventsToSend.size()) {
-				newData = false;
-				for (int i=0;i<eventsToSend.size();i++)
-					if (!eventsToSend.get(i).equals(eventsSuccessfullySent.get(i))) {
-						newData = true;
-						break;
-					}
-			}
-		}
-		
 		if (newData) {
 			currentSyncId++;
 			currentSyncId = currentSyncId <= 0 ? (byte) 1 : currentSyncId;
-			sendInitDataMsg(Math.min(eventsToSend.size(), MAX_NUM_EVENTS_TO_SEND), currentSyncId);
+			sendInitDataMsg(Math.min(itemsToSend.size(), MAX_NUM_ITEMS_TO_SEND), currentSyncId);
 			state = STATE_INIT_SENT;
 		} else {
 			sendNoNewDataMsg();
 			state = STATE_NO_NEW_DATA_MSG_SENT;
 		}
 	}
-	
+
 	/**
 	 * Inform the watch that its dataset is up-to-date
 	 */
@@ -428,49 +517,67 @@ public class PebbleCommService extends Service {
 	/**
 	 * Sends init message.
 	 * 
-	 * @param numberOfEvents
-	 * @param syncId Id of this sync process to report to the watch
+	 * @param numberOfItems
+	 * @param syncId
+	 *            Id of this sync process to report to the watch
 	 */
-	private void sendInitDataMsg(int numberOfEvents, byte syncId) {
-		Log.d("PebbleCommunication", "sending init message, advertising " + numberOfEvents + " events and syncId "+syncId);
+	private void sendInitDataMsg(int numberOfItems, byte syncId) {
+		Log.d("PebbleCommunication", "sending init message, advertising " + numberOfItems + " items and syncId " + syncId);
 		PebbleDictionary data = new PebbleDictionary();
 		data.addUint8(PEBBLE_KEY_COMMAND, PEBBLE_COMMAND_INIT_DATA); // command
-		data.addUint8(PEBBLE_KEY_NUM_EVENTS, (byte) numberOfEvents); // number of events we will send
-		data.addUint8(PEBBLE_KEY_SYNC_ID, syncId); //id of the data we're about to send (to compare against existing data)
+		data.addUint8(PEBBLE_KEY_NUM_ITEMS, (byte) numberOfItems); // number of items we will send
+		data.addUint8(PEBBLE_KEY_SYNC_ID, syncId); // id of the data we're about to send (to compare against existing data)
 		data.addUint8(PEBBLE_KEY_VERSION, CURRENT_WATCHAPP_VERSION_MINIMUM); // expected minimum watchapp version
 		addPebbleSettings(data); // general and design settings
 		sendMessage(data, false);
 	}
 
 	/**
-	 * Sends a first event half message
+	 * Sends a message with the item
 	 * 
 	 * @param e
 	 */
-	private void sendFirstEventHalf(CalendarEvent e) {
+	private void sendItem(AgendaItem e) {
 		PebbleDictionary data = new PebbleDictionary();
-		data.addUint8(PEBBLE_KEY_COMMAND, PEBBLE_COMMAND_CAL_EVENT); // command
-		data.addString(PEBBLE_KEY_CAL_TITLE, e.title == null ? "(no title)" : e.title.length() > 30 ? e.title.substring(0, 30) : e.title);
-		data.addString(PEBBLE_KEY_CAL_LOC, e.location == null ? "" : e.location.length() > 30 ? e.location.substring(0, 30) : e.location);
-		data.addUint8(PEBBLE_KEY_CAL_ALLDAY, e.allDay ? (byte) 1 : (byte) 0);
+		data.addUint8(PEBBLE_KEY_COMMAND, PEBBLE_COMMAND_ITEM); // command
+		data.addString(PEBBLE_KEY_ITEM_TEXT1, e.line1 == null ? "" : e.line1.text == null ? "(no text)" : e.line1.text.length() > 29 ? e.line1.text.substring(0, 30) : e.line1.text);
+		data.addString(PEBBLE_KEY_ITEM_TEXT2, e.line2 == null ? "" : e.line2.text == null ? "(no text)" : e.line2.text.length() > 29 ? e.line2.text.substring(0, 30) : e.line2.text);
+		data.addUint8(PEBBLE_KEY_ITEM_DESIGN1, e.line1 == null ? 0 : getPebbleDesign(e.line1, 1));
+		data.addUint8(PEBBLE_KEY_ITEM_DESIGN2, e.line2 == null ? 0 : getPebbleDesign(e.line2, 2));
+		data.addInt32(PEBBLE_KEY_ITEM_START_TIME, e.getStartTimeInPebbleFormat());
+		data.addInt32(PEBBLE_KEY_ITEM_END_TIME, e.getEndTimeInPebbleFormat());
 		sendMessage(data, false);
 	}
-
+	
 	/**
-	 * Sends second half of an event
-	 * 
-	 * @param e
+	 * Computes the design for the pebble
+	 * @param line
+	 * @param linenum
+	 * @return
 	 */
-	private void sendSecondEventHalf(CalendarEvent e) {
-		PebbleDictionary data = new PebbleDictionary();
-		data.addUint8(PEBBLE_KEY_COMMAND, PEBBLE_COMMAND_CAL_EVENT_TIME);
-
-		// Set times
-		data.addInt32(PEBBLE_KEY_CAL_START_TIME, e.getStartTimeInPebbleFormat());
-		data.addInt32(PEBBLE_KEY_CAL_END_TIME, e.getEndTimeInPebbleFormat());
-
-		// Send data
-		sendMessage(data, false);
+	private byte getPebbleDesign(AgendaItem.Line line, int linenum) {
+		byte result = 1; //[sic!] to distinguish between hiding the line and simply all-zero settings
+		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+		
+		if (line.textBold)
+			result |= 0x20;
+		
+		TimeDisplayType time_type = line.timeDisplay;
+		if (time_type == null)
+			time_type = TimeDisplayType.values()[Integer.parseInt(prefs.getString("pref_layout_time_"+linenum, linenum == 1 ? "0" : "4"))];
+		result |= time_type.ordinal()*0x02;
+		
+		if (time_type != TimeDisplayType.NONE) {
+			boolean showCountdown = false;
+			if (line.timeShowCountdown != null)
+				showCountdown = line.timeShowCountdown;
+			else
+				showCountdown = prefs.getBoolean("pref_layout_countdown", false);
+			if (showCountdown)
+				result |= 0x10;
+		}
+		
+		return result;
 	}
 
 	/**
@@ -481,7 +588,7 @@ public class PebbleCommService extends Service {
 		data2.addUint8(PEBBLE_KEY_COMMAND, PEBBLE_COMMAND_DONE);
 		sendMessage(data2, false);
 	}
-	
+
 	/**
 	 * Send message that we want the watch to request an update (e.g., to get to know its version)
 	 */

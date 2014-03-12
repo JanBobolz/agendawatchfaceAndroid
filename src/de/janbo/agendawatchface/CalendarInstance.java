@@ -6,9 +6,9 @@ package de.janbo.agendawatchface;
  *
  */
 public class CalendarInstance {
-	long id; //id according to the content provider
-	String name; //name of calendar
-	String account; //account name the calendar belongs to
+	public long id; //id according to the content provider
+	public String name; //name of calendar
+	public String account; //account name the calendar belongs to
 	
 	public CalendarInstance(long id, String name, String account) {
 		super();
