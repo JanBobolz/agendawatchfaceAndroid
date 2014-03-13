@@ -30,7 +30,7 @@ public class AgendaCalendarService extends Service {
 		@Override
 		public void onChange(boolean selfChange) {
 			Log.d("AgendaCalendarService", "Calendar changed (observer fired)");
-			Intent intent = new Intent(getApplicationContext(), AgendaCalendarService.class);
+			Intent intent = new Intent(AgendaCalendarService.this, AgendaCalendarService.class);
 			startService(intent);
 		}
 	};
@@ -48,7 +48,7 @@ public class AgendaCalendarService extends Service {
 	
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
-		new AgendaCalendarProvider().publishData(this, getEvents(10));
+		new AgendaCalendarProvider().publishData(this, getEvents(30));
 		return START_STICKY;
 	}
 	

@@ -45,7 +45,6 @@ public class AgendaWatchfaceService extends Service {
 	public static final byte CURRENT_WATCHAPP_VERSION_BUNDLED = 8; // bundled watchapp version
 	public static final byte CURRENT_WATCHAPP_VERSION_MINIMUM = 8; // smallest version of watchapp that is still supported
 
-	public static final int MAX_NUM_ITEMS_TO_SEND = 10; // should correspond to number of items saved in the watch database
 	public static final long WAIT_TIME_FOR_PLUGIN_REPORTS = 2 * 1000; // maximum time to wait with first sync before all plugins report (in ms)
 	public static final int PLUGIN_SYNC_INTERVAL = 30; // interval to get new data from plugins (in minutes)
 
@@ -320,7 +319,7 @@ public class AgendaWatchfaceService extends Service {
 
 		case STATE_SENT_ITEM_WAIT_FOR_ACK: // ack was for item. Send next item
 			currentIndex++;
-			if (currentIndex < itemsToSend.size() && currentIndex < MAX_NUM_ITEMS_TO_SEND) { // still things to send
+			if (currentIndex < itemsToSend.size()) { // still things to send
 				sendItem(itemsToSend.get(currentIndex));
 				state = STATE_SENT_ITEM_WAIT_FOR_ACK;
 			} else {
@@ -425,6 +424,7 @@ public class AgendaWatchfaceService extends Service {
 		flags |= Integer.parseInt(prefs.getString("pref_header_time_size", "0")) % 2 == 1 ? 0x80 : 0;
 		flags |= Integer.parseInt(prefs.getString("pref_header_time_size", "0")) > 1 ? 0x100 : 0;
 		flags |= prefs.getBoolean("pref_separator_date", false) ? 0x200 : 0;
+		flags |= prefs.getBoolean("pref_enable_scroll", true) ? 0x400 : 0;
 
 		dict.addUint32(PEBBLE_KEY_SETTINGS_BOOLFLAGS, flags);
 	}
@@ -476,6 +476,8 @@ public class AgendaWatchfaceService extends Service {
 		if (state != STATE_WAIT_FOR_WATCH_REQUEST) {
 			Log.d("PebbleCommunication", "Restarting sending of items");
 		}
+		
+		int max_num_items_to_send = Integer.parseInt(PreferenceManager.getDefaultSharedPreferences(this).getString("pref_send_num_items", "10"));
 
 		Calendar cal = Calendar.getInstance();
 		long now = cal.getTimeInMillis();
@@ -489,8 +491,8 @@ public class AgendaWatchfaceService extends Service {
 					itemsToSend.add(item);
 
 		Collections.sort(itemsToSend); // Sort
-		if (itemsToSend.size() > MAX_NUM_ITEMS_TO_SEND) // Trim
-			itemsToSend.subList(MAX_NUM_ITEMS_TO_SEND, itemsToSend.size()).clear();
+		if (itemsToSend.size() > max_num_items_to_send) // Trim
+			itemsToSend.subList(max_num_items_to_send, itemsToSend.size()).clear();
 
 		currentIndex = -1;
 
@@ -503,7 +505,7 @@ public class AgendaWatchfaceService extends Service {
 		if (newData) {
 			currentSyncId++;
 			currentSyncId = currentSyncId <= 0 ? (byte) 1 : currentSyncId;
-			sendInitDataMsg(Math.min(itemsToSend.size(), MAX_NUM_ITEMS_TO_SEND), currentSyncId);
+			sendInitDataMsg(itemsToSend.size(), currentSyncId);
 			state = STATE_INIT_SENT;
 		} else {
 			sendNoNewDataMsg();
