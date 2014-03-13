@@ -31,3 +31,6 @@ proguard/
 
 #svn
 .svn/
+
+#windows
+Thumbs.db

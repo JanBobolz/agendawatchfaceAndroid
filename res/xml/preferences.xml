@@ -26,7 +26,7 @@
             android:key="pref_layout_font_size"
             android:title="Font size" />
         <CheckBoxPreference android:summaryOff="Only ever show the topmost events" android:title="Scrolling" android:key="pref_enable_scroll" android:defaultValue="true" android:summaryOn="Flicking your wrist scrolls down"/>
-        <ListPreference android:dialogTitle="Items to synchronize" android:entries="@array/setting_send_num_items_values" android:key="pref_send_num_items" android:entryValues="@array/setting_send_num_items_values" android:title="Number of items to synchronize" android:summary="How many items should the watch receive?" android:defaultValue="10"/>
+        <ListPreference android:dialogTitle="Items to synchronize" android:entries="@array/setting_send_num_items_values" android:key="pref_send_num_items" android:entryValues="@array/setting_send_num_items_values" android:title="Maximal number of items to synchronize" android:summary="How many items should the watch receive?" android:defaultValue="10"/>
     </PreferenceCategory>
     <PreferenceCategory android:title="Time format" >
         <CheckBoxPreference

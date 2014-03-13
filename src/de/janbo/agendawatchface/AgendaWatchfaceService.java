@@ -83,6 +83,7 @@ public class AgendaWatchfaceService extends Service {
 	public static final int PEBBLE_KEY_ITEM_START_TIME = 20; // int_32, in format: minutes + 60*hours + 60*24*weekday + 60*24*7*dayOfMonth + 60*24*7*32*(month-1) + 60*24*7*32*12*(year-1900). Or 0 to
 																// simply show "today"
 	public static final int PEBBLE_KEY_ITEM_END_TIME = 30; // int_32 or 0 to make it never end
+	public static final int PEBBLE_KEY_ITEM_INDEX = 5; // uint_8, index numbering the items in a sync (0 being the first item)
 	public static final int PEBBLE_KEY_SETTINGS_BOOLFLAGS = 40; // uint_32
 
 	public static final int PEBBLE_TO_PHONE_KEY_VERSION = 0; // current version of the watchface
@@ -313,14 +314,14 @@ public class AgendaWatchfaceService extends Service {
 			}
 
 			// Begin sending first item
-			sendItem(itemsToSend.get(currentIndex));
+			sendItem(itemsToSend.get(currentIndex), currentIndex);
 			state = STATE_SENT_ITEM_WAIT_FOR_ACK;
 			break;
 
 		case STATE_SENT_ITEM_WAIT_FOR_ACK: // ack was for item. Send next item
 			currentIndex++;
 			if (currentIndex < itemsToSend.size()) { // still things to send
-				sendItem(itemsToSend.get(currentIndex));
+				sendItem(itemsToSend.get(currentIndex), currentIndex);
 				state = STATE_SENT_ITEM_WAIT_FOR_ACK;
 			} else {
 				sendDoneMessage();
@@ -546,9 +547,10 @@ public class AgendaWatchfaceService extends Service {
 	 * 
 	 * @param e
 	 */
-	private void sendItem(AgendaItem e) {
+	private void sendItem(AgendaItem e, int index) {
 		PebbleDictionary data = new PebbleDictionary();
 		data.addUint8(PEBBLE_KEY_COMMAND, PEBBLE_COMMAND_ITEM); // command
+		data.addUint8(PEBBLE_KEY_ITEM_INDEX, (byte) index);
 		data.addString(PEBBLE_KEY_ITEM_TEXT1, e.line1 == null ? "" : e.line1.text == null ? "(no text)" : e.line1.text.length() > 29 ? e.line1.text.substring(0, 30) : e.line1.text);
 		data.addString(PEBBLE_KEY_ITEM_TEXT2, e.line2 == null ? "" : e.line2.text == null ? "(no text)" : e.line2.text.length() > 29 ? e.line2.text.substring(0, 30) : e.line2.text);
 		data.addUint8(PEBBLE_KEY_ITEM_DESIGN1, e.line1 == null ? 0 : getPebbleDesign(e.line1, 1));
