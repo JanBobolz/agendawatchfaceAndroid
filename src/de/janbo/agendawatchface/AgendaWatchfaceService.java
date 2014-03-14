@@ -85,6 +85,7 @@ public class AgendaWatchfaceService extends Service {
 	public static final int PEBBLE_KEY_ITEM_END_TIME = 30; // int_32 or 0 to make it never end
 	public static final int PEBBLE_KEY_ITEM_INDEX = 5; // uint_8, index numbering the items in a sync (0 being the first item)
 	public static final int PEBBLE_KEY_SETTINGS_BOOLFLAGS = 40; // uint_32
+	public static final int PEBBLE_KEY_VIBRATE = 6; //uint_8, if nonzero: instructs watch to vibrate according to pattern (PEBBLE_VIBRATE_... constants). Sent in DONE message
 
 	public static final int PEBBLE_TO_PHONE_KEY_VERSION = 0; // current version of the watchface
 	public static final int PEBBLE_TO_PHONE_KEY_VERSIONBACKWARD = 1; // version of bundled firmware that this app must have to support the watchface version
@@ -96,6 +97,12 @@ public class AgendaWatchfaceService extends Service {
 	public static final byte PEBBLE_COMMAND_DONE = 2;
 	public static final byte PEBBLE_COMMAND_NO_NEW_DATA = 4;
 	public static final byte PEBBLE_COMMAND_FORCE_REQUEST = 5; // requests the watch to send a request (to update version, etc.)
+	
+	// Vibrate options
+	public static final byte PEBBLE_VIBRATE_NONE = 0;
+	public static final byte PEBBLE_VIBRATE_SHORT = 1;
+	public static final byte PEBBLE_VIBRATE_TWICE_SHORT = 2;
+	public static final byte PEBBLE_VIBRATE_LONG = 3;
 
 	// Variables
 	private int state = STATE_INITIAL_POPULATING_PLUGIN_DATA;
@@ -105,6 +112,7 @@ public class AgendaWatchfaceService extends Service {
 	private List<AgendaItem> itemsSuccessfullySent = null; // last list we sent completely (DONE message). Data corresponds to lastSuccessfulSyncId below
 	private byte lastSuccessfulSyncId = 0; // id that we gave the watchface for the last sync that went through (DONE message) (used for checking for new data) - 0 means "don't know, send anyway!"
 	private byte lastWatchReportedSyncId = 0; // the newest sync id reported by the watch in a request
+	private boolean vibrate_on_next_done = false; // if set to true, will instruct watch to vibrate after sync. It's auto-reset after that.
 
 	private HashMap<String, List<AgendaItem>> pluginData = new HashMap<String, List<AgendaItem>>(); // Maps pluginId -> current list of items
 
@@ -250,7 +258,7 @@ public class AgendaWatchfaceService extends Service {
 				} catch (RuntimeException e) {
 					Log.e("AgendaWatchfaceService", "Plugin supplied invalid data", e);
 				}
-				handleReceivedPluginData(items, intent.getStringExtra(AgendaWatchfacePlugin.MAIN_SERVICE_INTENT_EXTRA_PLUGIN_ID));
+				handleReceivedPluginData(items, intent.getStringExtra(AgendaWatchfacePlugin.MAIN_SERVICE_INTENT_EXTRA_PLUGIN_ID), intent.getBooleanExtra(AgendaWatchfacePlugin.MAIN_SERVICE_INTENT_EXTRA_VIBRATE, false));
 			}
 		} else if (intent != null && INTENT_ACTION_REFRESH_PLUGIN_DATA.equals(intent.getAction())) {
 			issueGatherPluginData();
@@ -266,7 +274,7 @@ public class AgendaWatchfaceService extends Service {
 		return START_STICKY; // we want the service to persist
 	}
 
-	private void handleReceivedPluginData(List<AgendaItem> items, String pluginId) {
+	private void handleReceivedPluginData(List<AgendaItem> items, String pluginId, boolean vibrate) {
 		if (pluginId == null) {
 			Log.e("AgendaWatchfaceService", "No plugin id supplied");
 			return;
@@ -282,6 +290,9 @@ public class AgendaWatchfaceService extends Service {
 			return;
 		}
 
+		if (vibrate)
+			vibrate_on_next_done = true;
+		
 		pluginData.put(pluginId, items);
 		doWatchSyncOnChanges();
 	}
@@ -335,6 +346,7 @@ public class AgendaWatchfaceService extends Service {
 			lastSync = System.currentTimeMillis();
 			lastSuccessfulSyncId = currentSyncId;
 			itemsSuccessfullySent = itemsToSend;
+			vibrate_on_next_done = false;
 
 			broadcastCurrentData();
 			break;
@@ -598,6 +610,7 @@ public class AgendaWatchfaceService extends Service {
 	private void sendDoneMessage() {
 		PebbleDictionary data2 = new PebbleDictionary();
 		data2.addUint8(PEBBLE_KEY_COMMAND, PEBBLE_COMMAND_DONE);
+		data2.addUint8(PEBBLE_KEY_VIBRATE, vibrate_on_next_done ? Byte.valueOf(PreferenceManager.getDefaultSharedPreferences(this).getString("pref_vibrate_type", "1")) : PEBBLE_VIBRATE_NONE);
 		sendMessage(data2, false);
 	}
 

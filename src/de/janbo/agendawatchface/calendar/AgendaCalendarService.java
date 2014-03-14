@@ -48,7 +48,7 @@ public class AgendaCalendarService extends Service {
 	
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
-		new AgendaCalendarProvider().publishData(this, getEvents(30));
+		new AgendaCalendarProvider().publishData(this, getEvents(30), false);
 		return START_STICKY;
 	}
 	

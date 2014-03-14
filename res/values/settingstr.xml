@@ -50,5 +50,17 @@
         <item >25</item>
         <item >30</item>
     </string-array>
+    <string-array name="setting_vibrate_human">
+        <item >Never vibrate</item>
+        <item >Short</item>
+        <item >Short twice</item>
+        <item >Long</item>
+    </string-array>
+    <string-array name="setting_vibrate_values">
+        <item >0</item>
+        <item >1</item>
+        <item >2</item>
+        <item >3</item>
+    </string-array>
     
 </resources>
