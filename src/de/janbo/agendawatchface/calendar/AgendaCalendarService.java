@@ -21,8 +21,8 @@ import android.provider.CalendarContract.Calendars;
 import android.provider.CalendarContract.Events;
 import android.provider.CalendarContract.Instances;
 import android.util.Log;
-import de.janbo.agendawatchface.CalendarInstance;
 import de.janbo.agendawatchface.api.AgendaItem;
+import de.janbo.agendawatchface.api.LineOverflowBehavior;
 import de.janbo.agendawatchface.api.TimeDisplayType;
 
 public class AgendaCalendarService extends Service {	
@@ -109,7 +109,7 @@ public class AgendaCalendarService extends Service {
 			//Add event to result
 			boolean allday = cur.getInt(cur.getColumnIndex(Instances.ALL_DAY)) != 0;
 			String line1textCode = prefs.getString("pref_layout"+(allday ? "_ad" : "")+"_text_1", allday ? "1" : "1");
-			String line2textCode = prefs.getString("pref_layout"+(allday ? "_ad" : "")+"_text_2", allday ? "1" : "1");
+			String line2textCode = prefs.getString("pref_layout"+(allday ? "_ad" : "")+"_text_2", allday ? "2" : "2");
 			String line1text = line1textCode.equals("1") ? cur.getString(cur.getColumnIndex(Instances.TITLE)) : cur.getString(cur.getColumnIndex(Instances.EVENT_LOCATION));
 			String line2text = line2textCode.equals("1") ? cur.getString(cur.getColumnIndex(Instances.TITLE)) : cur.getString(cur.getColumnIndex(Instances.EVENT_LOCATION));;
 			
@@ -119,16 +119,20 @@ public class AgendaCalendarService extends Service {
 			if (cur.getInt(cur.getColumnIndex(Instances.ALL_DAY)) != 0)  //adjust timezone 
 				item.timezone = TimeZone.getTimeZone("UTC");
 			
+			//Line 1
 			item.line1 = new AgendaItem.Line();
 			item.line1.text = line1text;
 			item.line1.textBold = line1textCode.equals("1");
+			item.line1.overflow = (allday && prefs.getBoolean("pref_layout_ad_overflow_row1", true) || !allday && prefs.getBoolean("pref_layout_overflow_row1", true)) ? LineOverflowBehavior.OVERFLOW_IF_NECESSARY : LineOverflowBehavior.NONE;
 			if (allday)
 				item.line1.timeDisplay = TimeDisplayType.NONE;
 			
+			//Line 2
 			if (allday && prefs.getBoolean("pref_layout_ad_show_row2", false) || !allday && prefs.getBoolean("pref_layout_show_row2", true)) {
 				item.line2 = new AgendaItem.Line();
 				item.line2.text = line2text;
 				item.line2.textBold = line2textCode.equals("1");
+				item.line2.overflow = (allday && prefs.getBoolean("pref_layout_ad_overflow_row2", true) || !allday && prefs.getBoolean("pref_layout_overflow_row2", true)) ? LineOverflowBehavior.OVERFLOW_IF_NECESSARY : LineOverflowBehavior.NONE;
 				if (allday)
 					item.line2.timeDisplay = TimeDisplayType.NONE;
 			}

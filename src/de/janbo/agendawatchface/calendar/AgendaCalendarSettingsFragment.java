@@ -6,7 +6,6 @@ import android.os.Bundle;
 import android.preference.CheckBoxPreference;
 import android.preference.PreferenceFragment;
 import android.preference.PreferenceScreen;
-import de.janbo.agendawatchface.CalendarInstance;
 import de.janbo.agendawatchface.R;
 
 public class AgendaCalendarSettingsFragment extends PreferenceFragment {

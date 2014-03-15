@@ -47,6 +47,7 @@ public class AgendaWatchfaceService extends Service {
 
 	public static final long WAIT_TIME_FOR_PLUGIN_REPORTS = 2 * 1000; // maximum time to wait with first sync before all plugins report (in ms)
 	public static final int PLUGIN_SYNC_INTERVAL = 30; // interval to get new data from plugins (in minutes)
+	public static final int MAX_STRING_LEN_TO_SEND = 50; //how long may the strings be that we send to the watch?
 
 	// Android app internals
 	public static final String INTENT_ACTION_WATCHAPP_GIVE_INFO = "de.janbo.agendawatchface.intent.action.givedata"; // answers to requests will be broadcast using this action
@@ -65,6 +66,8 @@ public class AgendaWatchfaceService extends Service {
 	public static final int STATE_WAIT_FOR_WATCH_REQUEST = 0; // Nothing happening
 	public static final int STATE_INIT_SENT = 1; // First message (COMMAND_INIT_DATA) sent, waiting for ack
 	public static final int STATE_SENT_ITEM_WAIT_FOR_ACK = 2; // sent item, waiting for the watch to ack
+	public static final int STATE_SENT_ITEM_1_WAIT_FOR_ACK = 8; //sent first item half, waiting for the watck to ack
+	public static final int STATE_SENT_ITEM_2_WAIT_FOR_ACK = 9; //sent second item half, waiting for the watck to ack
 	public static final int STATE_SENT_DONE_MSG_WAIT_FOR_ACK = 4; // sent the done message, waiting for the watch to ack
 	public static final int STATE_RESTART_SYNC_ON_ACK = 5; // we were in the middle of a sync, but the watch wants a restart (act on this when receiving the next ack)
 	public static final int STATE_NO_NEW_DATA_MSG_SENT = 6; // we sent COMMAND_NO_NEW_DATA, waiting for ack
@@ -92,7 +95,9 @@ public class AgendaWatchfaceService extends Service {
 	public static final int PEBBLE_TO_PHONE_KEY_LAST_SYNC_ID = 2; // id of the last sync that went through correctly according to watch (0 to force)
 
 	// Pebble commands
-	public static final byte PEBBLE_COMMAND_ITEM = 1;
+	public static final byte PEBBLE_COMMAND_ITEM = 1; //sending item in one message
+	public static final byte PEBBLE_COMMAND_ITEM_1 = 6; //sending first half of item
+	public static final byte PEBBLE_COMMAND_ITEM_2 = 7; //sending second half of item
 	public static final byte PEBBLE_COMMAND_INIT_DATA = 0;
 	public static final byte PEBBLE_COMMAND_DONE = 2;
 	public static final byte PEBBLE_COMMAND_NO_NEW_DATA = 4;
@@ -325,20 +330,36 @@ public class AgendaWatchfaceService extends Service {
 			}
 
 			// Begin sending first item
-			sendItem(itemsToSend.get(currentIndex), currentIndex);
-			state = STATE_SENT_ITEM_WAIT_FOR_ACK;
+			if (canBeSentInOneMessage(itemsToSend.get(currentIndex))) {
+				sendItem(itemsToSend.get(currentIndex), currentIndex);
+				state = STATE_SENT_ITEM_WAIT_FOR_ACK;
+			} else {
+				sendFirstItemHalf(itemsToSend.get(currentIndex), currentIndex);
+				state = STATE_SENT_ITEM_1_WAIT_FOR_ACK;
+			}
 			break;
 
+		case STATE_SENT_ITEM_2_WAIT_FOR_ACK: // ack was for second item half. Send next item
 		case STATE_SENT_ITEM_WAIT_FOR_ACK: // ack was for item. Send next item
 			currentIndex++;
 			if (currentIndex < itemsToSend.size()) { // still things to send
-				sendItem(itemsToSend.get(currentIndex), currentIndex);
-				state = STATE_SENT_ITEM_WAIT_FOR_ACK;
+				if (canBeSentInOneMessage(itemsToSend.get(currentIndex))) {
+					sendItem(itemsToSend.get(currentIndex), currentIndex);
+					state = STATE_SENT_ITEM_WAIT_FOR_ACK;
+				} else {
+					sendFirstItemHalf(itemsToSend.get(currentIndex), currentIndex);
+					state = STATE_SENT_ITEM_1_WAIT_FOR_ACK;
+				}
 			} else {
 				sendDoneMessage();
 				state = STATE_SENT_DONE_MSG_WAIT_FOR_ACK;
 			}
 			break;
+		
+		case STATE_SENT_ITEM_1_WAIT_FOR_ACK: //ack was for first item half. Send next half
+			sendSecondItemHalf(itemsToSend.get(currentIndex), currentIndex);
+			state = STATE_SENT_ITEM_2_WAIT_FOR_ACK;
+			break;			
 
 		case STATE_SENT_DONE_MSG_WAIT_FOR_ACK: // ack was for done message. This concludes the sync process
 			state = STATE_WAIT_FOR_WATCH_REQUEST;
@@ -413,7 +434,7 @@ public class AgendaWatchfaceService extends Service {
 						state = STATE_WAIT_FOR_WATCH_REQUEST;
 					}
 				}
-			}, 1000);
+			}, 3000);
 		} else {
 			Log.d("PebbleCommunication", "Received Nack for \"foreign\" transaction");
 		}
@@ -555,21 +576,71 @@ public class AgendaWatchfaceService extends Service {
 	}
 
 	/**
+	 * Returns true iff the item is small enough to safely send it in one message
+	 * @param e the event to send
+	 */
+	private boolean canBeSentInOneMessage(AgendaItem e) {
+		String line1 = e.line1 == null ? "" : e.line1.text == null ? "(null)" : e.line1.text.length() >= MAX_STRING_LEN_TO_SEND ? e.line1.text.substring(0, MAX_STRING_LEN_TO_SEND) : e.line1.text;
+		String line2 = e.line2 == null ? "" : e.line2.text == null ? "(null)" : e.line2.text.length() >= MAX_STRING_LEN_TO_SEND ? e.line2.text.substring(0, MAX_STRING_LEN_TO_SEND) : e.line2.text;
+		
+		return line1.getBytes().length+line2.getBytes().length < 40;
+	}
+	
+	/**
 	 * Sends a message with the item
 	 * 
-	 * @param e
+	 * @param e the item to send
+	 * @param index the index in this sync
 	 */
 	private void sendItem(AgendaItem e, int index) {
 		PebbleDictionary data = new PebbleDictionary();
 		data.addUint8(PEBBLE_KEY_COMMAND, PEBBLE_COMMAND_ITEM); // command
 		data.addUint8(PEBBLE_KEY_ITEM_INDEX, (byte) index);
-		data.addString(PEBBLE_KEY_ITEM_TEXT1, e.line1 == null ? "" : e.line1.text == null ? "(no text)" : e.line1.text.length() > 29 ? e.line1.text.substring(0, 30) : e.line1.text);
-		data.addString(PEBBLE_KEY_ITEM_TEXT2, e.line2 == null ? "" : e.line2.text == null ? "(no text)" : e.line2.text.length() > 29 ? e.line2.text.substring(0, 30) : e.line2.text);
+		data.addString(PEBBLE_KEY_ITEM_TEXT1, e.line1 == null ? "" : stringToSendableString(e.line1.text));
+		data.addString(PEBBLE_KEY_ITEM_TEXT2, e.line2 == null ? "" : stringToSendableString(e.line2.text));
 		data.addUint8(PEBBLE_KEY_ITEM_DESIGN1, e.line1 == null ? 0 : getPebbleDesign(e.line1, 1));
 		data.addUint8(PEBBLE_KEY_ITEM_DESIGN2, e.line2 == null ? 0 : getPebbleDesign(e.line2, 2));
 		data.addInt32(PEBBLE_KEY_ITEM_START_TIME, e.getStartTimeInPebbleFormat());
 		data.addInt32(PEBBLE_KEY_ITEM_END_TIME, e.getEndTimeInPebbleFormat());
 		sendMessage(data, false);
+	}
+	
+	/**
+	 * Sends a message with the first half of an item
+	 * @param e the item to send
+	 * @param index the index in this sync
+	 */
+	private void sendFirstItemHalf(AgendaItem e, int index) {
+		PebbleDictionary data = new PebbleDictionary();
+		data.addUint8(PEBBLE_KEY_COMMAND, PEBBLE_COMMAND_ITEM_1); // command
+		data.addUint8(PEBBLE_KEY_ITEM_INDEX, (byte) index);
+		data.addString(PEBBLE_KEY_ITEM_TEXT1, e.line1 == null ? "" : stringToSendableString(e.line1.text));
+		data.addUint8(PEBBLE_KEY_ITEM_DESIGN1, e.line1 == null ? 0 : getPebbleDesign(e.line1, 1));
+		data.addInt32(PEBBLE_KEY_ITEM_START_TIME, e.getStartTimeInPebbleFormat());
+		sendMessage(data, false);
+	}
+	
+	/**
+	 * Sends a message with the first half of an item
+	 * @param e the item to send
+	 * @param index the index in this sync
+	 */
+	private void sendSecondItemHalf(AgendaItem e, int index) {
+		PebbleDictionary data = new PebbleDictionary();
+		data.addUint8(PEBBLE_KEY_COMMAND, PEBBLE_COMMAND_ITEM_2); // command
+		data.addUint8(PEBBLE_KEY_ITEM_INDEX, (byte) index);
+		data.addString(PEBBLE_KEY_ITEM_TEXT2, e.line2 == null ? "" : stringToSendableString(e.line2.text));
+		data.addUint8(PEBBLE_KEY_ITEM_DESIGN2, e.line2 == null ? 0 : getPebbleDesign(e.line2, 2));
+		data.addInt32(PEBBLE_KEY_ITEM_END_TIME, e.getEndTimeInPebbleFormat());
+		sendMessage(data, false);
+	}
+	
+	private String stringToSendableString(String str) {
+		if (str == null)
+			return "(null)";
+		if (str.length() > MAX_STRING_LEN_TO_SEND)
+			return str.substring(0, MAX_STRING_LEN_TO_SEND-4)+"...";
+		return str;
 	}
 
 	/**
@@ -583,9 +654,14 @@ public class AgendaWatchfaceService extends Service {
 		byte result = 1; // [sic!] to distinguish between hiding the line and simply all-zero settings
 		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
 
+		//Bold
 		if (line.textBold)
 			result |= 0x20;
+		
+		//Overflow
+		result |= line.overflow.ordinal()*0x40;
 
+		//TimeDisplayType
 		TimeDisplayType time_type = line.timeDisplay;
 		if (time_type == null)
 			time_type = TimeDisplayType.values()[Integer.parseInt(prefs.getString("pref_layout_time_" + linenum, linenum == 1 ? "0" : "4"))];
@@ -632,7 +708,7 @@ public class AgendaWatchfaceService extends Service {
 	 */
 	private synchronized boolean sendMessage(PebbleDictionary data, boolean resend) {
 		transactionFlying = (transactionFlying + 1) % 256; // new transaction
-		if ((numRetries = resend ? numRetries + 1 : 0) > 1) {
+		if ((numRetries = resend ? numRetries + 1 : 0) > 2) {
 			Log.d("PebbleCommunication", "Stopped retrying message sending in state " + state);
 			return false;
 		}

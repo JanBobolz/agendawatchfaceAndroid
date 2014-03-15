@@ -1,4 +1,4 @@
-package de.janbo.agendawatchface;
+package de.janbo.agendawatchface.calendar;
 
 /**
  * Data class for a Calendar on the phone
