@@ -7,5 +7,6 @@
         android:title="Install Watchapp"/>
     <item android:id="@+id/action_settings" android:showAsAction="ifRoom|withText" android:title="Settings"></item>
     <item android:id="@+id/action_show_appstore" android:title="Show in Pebble store" android:showAsAction="never" android:titleCondensed="Pebble Store"></item>
+    <item android:id="@+id/action_show_plugin_page" android:title="Find plugins"></item>
 
 </menu>

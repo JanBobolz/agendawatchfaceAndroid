@@ -109,6 +109,9 @@ public class MainActivity extends Activity {
 			intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
 			startActivity(intent);
 			return true;
+		case R.id.action_show_plugin_page:
+			startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("http://jan-bobolz.de/agendawatchface/plugins/")));
+			return true;
 		default:
 			return false;
 		}
