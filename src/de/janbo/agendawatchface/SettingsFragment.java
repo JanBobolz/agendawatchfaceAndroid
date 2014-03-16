@@ -44,6 +44,7 @@ public class SettingsFragment extends PreferenceFragment {
 				@Override
 				public boolean onPreferenceClick(Preference preference) {
 					Intent settingBroadcastIntent = new Intent(AgendaWatchfacePlugin.INTENT_ACTION_AGENDA_PROVIDER);
+					settingBroadcastIntent.addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES);
 					settingBroadcastIntent.putExtra(AgendaWatchfacePlugin.INTENT_EXTRA_REQUEST_TYPE, AgendaWatchfacePlugin.REQUEST_TYPE_SHOW_SETTINGS);
 					settingBroadcastIntent.putExtra(AgendaWatchfacePlugin.INTENT_EXTRA_REQUEST_PLUGIN_ID, pluginId);
 					settingBroadcastIntent.putExtra(AgendaWatchfacePlugin.INTENT_EXTRA_PROTOCOL_VERSION, AgendaWatchfacePlugin.PLUGIN_PROTOCOL_VERSION);
@@ -82,6 +83,7 @@ public class SettingsFragment extends PreferenceFragment {
 		getActivity().registerReceiver(discoverer, filter);
 		
 		Intent intent = new Intent(AgendaWatchfacePlugin.INTENT_ACTION_AGENDA_PROVIDER);
+		intent.addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES);
 		intent.putExtra(AgendaWatchfacePlugin.INTENT_EXTRA_PROTOCOL_VERSION, AgendaWatchfacePlugin.PLUGIN_PROTOCOL_VERSION);
 		intent.putExtra(AgendaWatchfacePlugin.INTENT_EXTRA_REQUEST_TYPE, AgendaWatchfacePlugin.REQUEST_TYPE_DISCOVER);
 		getActivity().sendBroadcast(intent);
