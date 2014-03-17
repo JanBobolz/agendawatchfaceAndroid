@@ -12,7 +12,7 @@
         android:id="@+id/textView1"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Welcome to the AgendaWatchface companion app. "
+        android:text="Hi! You can access settings through the menu. AgendaWatchface can not only show your calendar events but there is also a plugins mechanism that allows other information to be displayed. Check out a list of existing plugins through the menu!"
         android:textAppearance="?android:attr/textAppearanceMedium" />
 
     <TextView
