@@ -459,6 +459,7 @@ public class AgendaWatchfaceService extends Service {
 		flags |= Integer.parseInt(prefs.getString("pref_header_time_size", "0")) > 1 ? 0x100 : 0;
 		flags |= prefs.getBoolean("pref_separator_date", false) ? 0x200 : 0;
 		flags |= prefs.getBoolean("pref_enable_scroll", true) ? 0x400 : 0;
+		flags |= prefs.getBoolean("pref_layout_countdown", false) ? 0x800 : 0;
 
 		dict.addUint32(PEBBLE_KEY_SETTINGS_BOOLFLAGS, flags);
 	}
@@ -469,6 +470,7 @@ public class AgendaWatchfaceService extends Service {
 	private void issueGatherPluginData() {
 		// Send the broadcast to notify everyone
 		Intent intent = new Intent(AgendaWatchfacePlugin.INTENT_ACTION_AGENDA_PROVIDER);
+		intent.addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES);
 		intent.putExtra(AgendaWatchfacePlugin.INTENT_EXTRA_PROTOCOL_VERSION, AgendaWatchfacePlugin.PLUGIN_PROTOCOL_VERSION);
 		intent.putExtra(AgendaWatchfacePlugin.INTENT_EXTRA_REQUEST_TYPE, AgendaWatchfacePlugin.REQUEST_TYPE_REFRESH);
 		sendBroadcast(intent);
