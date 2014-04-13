@@ -460,6 +460,7 @@ public class AgendaWatchfaceService extends Service {
 		flags |= prefs.getBoolean("pref_separator_date", false) ? 0x200 : 0;
 		flags |= prefs.getBoolean("pref_enable_scroll", true) ? 0x400 : 0;
 		flags |= prefs.getBoolean("pref_layout_countdown", false) ? 0x800 : 0;
+		flags |= prefs.getBoolean("pref_continuous_scroll", true) ? 0x1000 : 0;
 
 		dict.addUint32(PEBBLE_KEY_SETTINGS_BOOLFLAGS, flags);
 	}
