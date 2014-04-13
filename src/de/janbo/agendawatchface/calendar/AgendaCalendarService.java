@@ -17,6 +17,7 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.IBinder;
 import android.preference.PreferenceManager;
+import android.provider.CalendarContract;
 import android.provider.CalendarContract.Calendars;
 import android.provider.CalendarContract.Events;
 import android.provider.CalendarContract.Instances;
@@ -87,23 +88,28 @@ public class AgendaCalendarService extends Service {
 		String[] selectionArgs = null;
 		
 		// Submit the query
-		cur = cr.query(getContentUri(), new String[] { Instances.CALENDAR_ID, Instances.EVENT_ID, Instances.EVENT_LOCATION, Instances.BEGIN, Instances.END, Instances.TITLE, Instances.ALL_DAY }, selection, selectionArgs,
+		cur = cr.query(getContentUri(), new String[] { Instances.CALENDAR_ID, Instances.EVENT_ID, Instances.EVENT_LOCATION, Instances.BEGIN, Instances.END, Instances.TITLE, Instances.ALL_DAY, Instances.SELF_ATTENDEE_STATUS }, selection, selectionArgs,
 				Instances.BEGIN + " ASC");
 
 		long now = Calendar.getInstance().getTimeInMillis();
 		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
 		boolean ignoreAllDayEvents = !prefs.getBoolean("pref_show_all_day_events", true);
+		boolean ignoreDeclinedEvents = !prefs.getBoolean("pref_show_declined_invitations", false);
 		while (cur.moveToNext()) {
 			//Filter all-day-events if set to ignore them
 			if (ignoreAllDayEvents && cur.getInt(cur.getColumnIndex(Instances.ALL_DAY)) != 0)
 				continue;
 			
-			// Filter non-all-day events that are already gone
+			// Filter non-all-day events that have already passed
 			if (cur.getInt(cur.getColumnIndex(Instances.ALL_DAY)) == 0 && cur.getLong(cur.getColumnIndex(Instances.END)) < now)
 				continue;
 			
 			//Filter calendars according to settings
 			if (!prefs.getBoolean("pref_cal_"+cur.getLong(cur.getColumnIndex(Instances.CALENDAR_ID))+"_picked", true))
+				continue;
+			
+			//Filter declined events
+			if (ignoreDeclinedEvents && cur.getInt(cur.getColumnIndex(Instances.SELF_ATTENDEE_STATUS)) == CalendarContract.Attendees.ATTENDEE_STATUS_DECLINED)
 				continue;
 			
 			//Add event to result
