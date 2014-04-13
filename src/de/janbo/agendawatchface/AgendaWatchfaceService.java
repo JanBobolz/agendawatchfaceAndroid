@@ -42,7 +42,7 @@ import android.util.Log;
  */
 public class AgendaWatchfaceService extends Service {
 	public static final UUID PEBBLE_APP_UUID = UUID.fromString("1f366804-f1d2-4288-b71a-708661777887");
-	public static final byte CURRENT_WATCHAPP_VERSION_BUNDLED = 9; // bundled watchapp version
+	public static final byte CURRENT_WATCHAPP_VERSION_BUNDLED = 10; // bundled watchapp version
 	public static final byte CURRENT_WATCHAPP_VERSION_MINIMUM = 8; // smallest version of watchapp that is still supported
 
 	public static final long WAIT_TIME_FOR_PLUGIN_REPORTS = 2 * 1000; // maximum time to wait with first sync before all plugins report (in ms)
