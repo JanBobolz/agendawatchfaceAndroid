@@ -25,10 +25,12 @@
             android:entryValues="@array/setting_font_size_choice_values"
             android:key="pref_layout_font_size"
             android:title="Font size" />
-        <CheckBoxPreference android:summaryOff="Only ever show the topmost events" android:title="Scrolling" android:key="pref_enable_scroll" android:defaultValue="true" android:summaryOn="Flick your wrist to scroll" android:disableDependentsState="false"/>
-        <CheckBoxPreference android:dependency="pref_enable_scroll" android:title="Continuous Scrolling" android:key="pref_continuous_scroll" android:summaryOff="Flicking wrist scrolls down a bit" android:summaryOn="Scroll by tilting the watch (activated by wrist flick)" android:defaultValue="true"/><ListPreference android:dialogTitle="Items to synchronize" android:entries="@array/setting_send_num_items_values" android:key="pref_send_num_items" android:entryValues="@array/setting_send_num_items_values" android:title="Maximal number of items to synchronize" android:summary="How many items should the watch receive?" android:defaultValue="10"/>
+        
+        <ListPreference android:dialogTitle="Items to synchronize" android:entries="@array/setting_send_num_items_values" android:key="pref_send_num_items" android:entryValues="@array/setting_send_num_items_values" android:title="Maximal number of items to synchronize" android:summary="How many items should the watch receive?" android:defaultValue="10"/>
         <ListPreference android:key="pref_vibrate_type" android:title="Vibration pattern" android:summary="Plugins may vibrate the watch on data change" android:defaultValue="1" android:entryValues="@array/setting_vibrate_values" android:entries="@array/setting_vibrate_human"/>
-    </PreferenceCategory>
+        
+        
+    </PreferenceCategory><PreferenceCategory android:title="Scrolling"><CheckBoxPreference android:summaryOff="Only ever show the topmost events" android:title="Scrolling" android:key="pref_enable_scroll" android:defaultValue="true" android:summaryOn="Flick your wrist to scroll" android:disableDependentsState="false" /><CheckBoxPreference android:dependency="pref_enable_scroll" android:title="Continuous Scrolling" android:key="pref_continuous_scroll" android:summaryOff="Flicking wrist scrolls down a bit" android:summaryOn="Scroll by tilting the watch (activated by wrist flick)" android:defaultValue="true" /><CheckBoxPreference android:dependency="pref_enable_scroll" android:title="Display light while scrolling" android:summaryOff="Light not triggered by scrolling" android:defaultValue="true" android:key="pref_light_while_scrolling" android:summaryOn="Respects backlight settings on watch" /></PreferenceCategory>
     <PreferenceCategory android:title="Time format" >
         <CheckBoxPreference
             android:defaultValue="false"
