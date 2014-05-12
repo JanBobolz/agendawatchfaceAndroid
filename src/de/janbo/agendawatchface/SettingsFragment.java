@@ -3,6 +3,7 @@ package de.janbo.agendawatchface;
 import java.util.HashSet;
 import java.util.Set;
 
+import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -10,6 +11,7 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.preference.Preference;
+import android.preference.Preference.OnPreferenceChangeListener;
 import android.preference.Preference.OnPreferenceClickListener;
 import android.preference.PreferenceCategory;
 import android.preference.PreferenceFragment;
@@ -87,6 +89,26 @@ public class SettingsFragment extends PreferenceFragment {
 		intent.putExtra(AgendaWatchfacePlugin.INTENT_EXTRA_PROTOCOL_VERSION, AgendaWatchfacePlugin.PLUGIN_PROTOCOL_VERSION);
 		intent.putExtra(AgendaWatchfacePlugin.INTENT_EXTRA_REQUEST_TYPE, AgendaWatchfacePlugin.REQUEST_TYPE_DISCOVER);
 		getActivity().sendBroadcast(intent);
+		
+		//Explanation dialog for pref_continuous_scroll
+		findPreference("pref_continuous_scroll").setOnPreferenceChangeListener(new OnPreferenceChangeListener() {
+			@Override
+			public boolean onPreferenceChange(Preference preference, Object newValue) {
+				if (Boolean.TRUE.equals(newValue)) {
+					AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+	
+					builder.setMessage("Flick your wrist to activate scrolling mode. \nIn this mode, tilt the bottom of the display "+
+								"downwards to scroll. \nTilt the other way to scroll up. \nWhen the top is reached again, "+
+								"scrolling mode ends.")
+					       .setTitle("Explanation")
+					       .setPositiveButton("Got it!", null);
+	
+					AlertDialog dialog = builder.create();
+					dialog.show();
+				}
+				return true;
+			}
+		});
 	}
 	
 	@Override
