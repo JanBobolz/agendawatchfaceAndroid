@@ -9,15 +9,6 @@ import java.util.UUID;
 
 import org.json.JSONException;
 
-import com.getpebble.android.kit.PebbleKit;
-import com.getpebble.android.kit.PebbleKit.PebbleAckReceiver;
-import com.getpebble.android.kit.PebbleKit.PebbleNackReceiver;
-import com.getpebble.android.kit.util.PebbleDictionary;
-
-import de.janbo.agendawatchface.api.AgendaItem;
-import de.janbo.agendawatchface.api.AgendaWatchfacePlugin;
-import de.janbo.agendawatchface.api.TimeDisplayType;
-
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
@@ -35,6 +26,15 @@ import android.preference.PreferenceManager;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 
+import com.getpebble.android.kit.PebbleKit;
+import com.getpebble.android.kit.PebbleKit.PebbleAckReceiver;
+import com.getpebble.android.kit.PebbleKit.PebbleNackReceiver;
+import com.getpebble.android.kit.util.PebbleDictionary;
+
+import de.janbo.agendawatchface.api.AgendaItem;
+import de.janbo.agendawatchface.api.AgendaWatchfacePlugin;
+import de.janbo.agendawatchface.api.TimeDisplayType;
+
 /**
  * Service that handles aggregation of items and communication with the watch.
  * 
@@ -47,7 +47,7 @@ public class AgendaWatchfaceService extends Service {
 
 	public static final long WAIT_TIME_FOR_PLUGIN_REPORTS = 2 * 1000; // maximum time to wait with first sync before all plugins report (in ms)
 	public static final int PLUGIN_SYNC_INTERVAL = 30; // interval to get new data from plugins (in minutes)
-	public static final int MAX_STRING_LEN_TO_SEND = 50; //how long may the strings be that we send to the watch?
+	public static final int MAX_STRING_LEN_TO_SEND = 49; //how long (in bytes) may the strings be that we send to the watch?
 
 	// Android app internals
 	public static final String INTENT_ACTION_WATCHAPP_GIVE_INFO = "de.janbo.agendawatchface.intent.action.givedata"; // answers to requests will be broadcast using this action
@@ -585,8 +585,8 @@ public class AgendaWatchfaceService extends Service {
 	 * @param e the event to send
 	 */
 	private boolean canBeSentInOneMessage(AgendaItem e) {
-		String line1 = e.line1 == null ? "" : e.line1.text == null ? "(null)" : e.line1.text.length() >= MAX_STRING_LEN_TO_SEND ? e.line1.text.substring(0, MAX_STRING_LEN_TO_SEND) : e.line1.text;
-		String line2 = e.line2 == null ? "" : e.line2.text == null ? "(null)" : e.line2.text.length() >= MAX_STRING_LEN_TO_SEND ? e.line2.text.substring(0, MAX_STRING_LEN_TO_SEND) : e.line2.text;
+		String line1 = e.line1 == null ? "" : stringToSendableString(e.line1.text);
+		String line2 = e.line2 == null ? "" : stringToSendableString(e.line2.text);
 		
 		return line1.getBytes().length+line2.getBytes().length < 40;
 	}
@@ -640,11 +640,19 @@ public class AgendaWatchfaceService extends Service {
 		sendMessage(data, false);
 	}
 	
+	/**
+	 * Trims the supplied string to conform to MAX_STRING_LEN_TO_SEND (cutting it to at most that many bytes)
+	 */
 	private String stringToSendableString(String str) {
 		if (str == null)
 			return "(null)";
-		if (str.length() > MAX_STRING_LEN_TO_SEND)
-			return str.substring(0, MAX_STRING_LEN_TO_SEND-4)+"...";
+		
+		if (str.getBytes().length > MAX_STRING_LEN_TO_SEND) { //trim string
+			int firstTrimmedByteIndex = MAX_STRING_LEN_TO_SEND-"...".getBytes().length; //index of the first byte that will not appear in the final string
+			while (firstTrimmedByteIndex >= 0 && (str.getBytes()[firstTrimmedByteIndex] & 0xC0) == 0x80) //some unicode magic, making sure not to split multi-byte chars (http://docs.oracle.com/javase/1.5.0/docs/api/java/io/DataInput.html#modified-utf-8)
+				firstTrimmedByteIndex--;
+			return new String(str.getBytes(),0,firstTrimmedByteIndex)+"...";
+		}
 		return str;
 	}
 
