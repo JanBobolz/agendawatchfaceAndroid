@@ -60,6 +60,9 @@
             android:summaryOn="Appending am or pm to times"
             android:title="Show am/pm" />
     </PreferenceCategory>
+    <PreferenceCategory android:title="Android app settings">
+        <CheckBoxPreference android:key="pref_notify_on_update" android:summaryOn="Show a notification when a new watchapp version is available" android:defaultValue="true" android:summaryOff="Do not notify me of non-mandatory updates to the watchface" android:title="Notify on update"/>
+    </PreferenceCategory>
     
 
 </PreferenceScreen>

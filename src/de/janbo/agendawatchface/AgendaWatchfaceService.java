@@ -42,7 +42,7 @@ import de.janbo.agendawatchface.api.TimeDisplayType;
  */
 public class AgendaWatchfaceService extends Service {
 	public static final UUID PEBBLE_APP_UUID = UUID.fromString("1f366804-f1d2-4288-b71a-708661777887");
-	public static final byte CURRENT_WATCHAPP_VERSION_BUNDLED = 10; // bundled watchapp version
+	public static final byte CURRENT_WATCHAPP_VERSION_BUNDLED = 11; // bundled watchapp version
 	public static final byte CURRENT_WATCHAPP_VERSION_MINIMUM = 8; // smallest version of watchapp that is still supported
 
 	public static final long WAIT_TIME_FOR_PLUGIN_REPORTS = 2 * 1000; // maximum time to wait with first sync before all plugins report (in ms)
@@ -399,7 +399,7 @@ public class AgendaWatchfaceService extends Service {
 			triggerAndroidAppUpdateNotification();
 			state = STATE_WAIT_FOR_WATCH_REQUEST;
 		} else if (version == null || version < CURRENT_WATCHAPP_VERSION_MINIMUM) { // watchface very outdated
-			triggerUpdateNotification();
+			triggerUpdateNotification(true);
 			state = STATE_WAIT_FOR_WATCH_REQUEST;
 		} else {
 			// everything good. Give the watch its data :)
@@ -410,6 +410,10 @@ public class AgendaWatchfaceService extends Service {
 				state = STATE_WAIT_FOR_WATCH_REQUEST; // restart the whole thing
 				doWatchSyncOnChanges();
 			}
+			
+			//If the user wants to, also notify on new bundled version (even though the update did not break functionality)
+			if (version != null && version < CURRENT_WATCHAPP_VERSION_BUNDLED && PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).getBoolean("pref_notify_on_update", true))
+				triggerUpdateNotification(false);
 		}
 
 		// Notify the activity if it's listening
@@ -736,7 +740,7 @@ public class AgendaWatchfaceService extends Service {
 	/**
 	 * Shows a notification prompting the user to update the watchapp
 	 */
-	private void triggerUpdateNotification() {
+	private void triggerUpdateNotification(boolean mandatoryUpgrade) {
 		if (notificationIssued != -1 && System.currentTimeMillis() - notificationIssued < 1000 * 60 * 60) // don't spam it
 			return;
 
@@ -745,7 +749,8 @@ public class AgendaWatchfaceService extends Service {
 		Intent intent = new Intent(getApplicationContext(), WatchappUpdateActivity.class);
 
 		NotificationCompat.Builder builder = new NotificationCompat.Builder(this).setSmallIcon(R.drawable.ic_launcher).setContentTitle("AgendaWatchface Update")
-				.setContentText("There is an update for AgendaWatchface on your Pebble! :) - Please update, otherwise synchronization will not work.");
+				.setContentText(mandatoryUpgrade ? "There is an update for AgendaWatchface on your Pebble! :) - Please update, otherwise synchronization will not work."
+									: "There is an update for AgendaWatchface on your Pebble! :)");
 		builder.setContentIntent(PendingIntent.getActivity(getApplicationContext(), 0, intent, Intent.FLAG_ACTIVITY_NEW_TASK));
 		builder.setAutoCancel(true);
 		NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
