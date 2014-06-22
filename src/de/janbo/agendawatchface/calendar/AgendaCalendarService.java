@@ -26,7 +26,7 @@ import de.janbo.agendawatchface.api.AgendaItem;
 import de.janbo.agendawatchface.api.LineOverflowBehavior;
 import de.janbo.agendawatchface.api.TimeDisplayType;
 
-public class AgendaCalendarService extends Service {	
+public class AgendaCalendarService extends Service {
 	private ContentObserver calendarObserver = new ContentObserver(null) { // content observer looking for calendar changes
 		@Override
 		public void onChange(boolean selfChange) {
