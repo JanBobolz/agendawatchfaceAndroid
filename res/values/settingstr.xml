@@ -39,7 +39,7 @@
         <item>1</item>
     </string-array>
     <string-array name="setting_header_size_choice_human">
-        <item >Default</item>
+        <item >Small</item>
         <item >Large</item>
     </string-array>
     <string-array name="setting_send_num_items_values">

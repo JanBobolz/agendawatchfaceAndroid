@@ -459,8 +459,8 @@ public class AgendaWatchfaceService extends Service {
 		flags |= prefs.getBoolean("pref_ampm", true) ? 0x04 : 0;
 		flags |= Integer.parseInt(prefs.getString("pref_layout_font_size", "0")) % 2 == 1 ? 0x20 : 0;
 		flags |= Integer.parseInt(prefs.getString("pref_layout_font_size", "0")) > 1 ? 0x40 : 0;
-		flags |= Integer.parseInt(prefs.getString("pref_header_time_size", "0")) % 2 == 1 ? 0x80 : 0;
-		flags |= Integer.parseInt(prefs.getString("pref_header_time_size", "0")) > 1 ? 0x100 : 0;
+		flags |= Integer.parseInt(prefs.getString("pref_header_time_size", "1")) % 2 == 1 ? 0x80 : 0;
+		flags |= Integer.parseInt(prefs.getString("pref_header_time_size", "1")) > 1 ? 0x100 : 0;
 		flags |= prefs.getBoolean("pref_separator_date", false) ? 0x200 : 0;
 		flags |= prefs.getBoolean("pref_enable_scroll", true) ? 0x400 : 0;
 		flags |= prefs.getBoolean("pref_layout_countdown", false) ? 0x800 : 0;

@@ -11,7 +11,7 @@
             android:title="Show header" />
 
         <ListPreference
-            android:defaultValue="0"
+            android:defaultValue="1"
             android:dependency="pref_show_header"
             android:entries="@array/setting_header_size_choice_human"
             android:entryValues="@array/setting_header_size_choice_values"
