@@ -116,8 +116,20 @@ public class AgendaCalendarService extends Service {
 			boolean allday = cur.getInt(cur.getColumnIndex(Instances.ALL_DAY)) != 0;
 			String line1textCode = prefs.getString("pref_layout"+(allday ? "_ad" : "")+"_text_1", allday ? "1" : "1");
 			String line2textCode = prefs.getString("pref_layout"+(allday ? "_ad" : "")+"_text_2", allday ? "2" : "2");
-			String line1text = line1textCode.equals("1") ? cur.getString(cur.getColumnIndex(Instances.TITLE)) : cur.getString(cur.getColumnIndex(Instances.EVENT_LOCATION));
-			String line2text = line2textCode.equals("1") ? cur.getString(cur.getColumnIndex(Instances.TITLE)) : cur.getString(cur.getColumnIndex(Instances.EVENT_LOCATION));;
+			String line1text = null;
+			String line2text = null;
+			try {
+				line1text = line1textCode.equals("0") ? "" 
+								: line1textCode.equals("1") ? cur.getString(cur.getColumnIndex(Instances.TITLE)) 
+								: cur.getString(cur.getColumnIndex(Instances.EVENT_LOCATION));
+			line2text = line2textCode.equals("0") ? "" 
+								: line2textCode.equals("1") ? cur.getString(cur.getColumnIndex(Instances.TITLE)) 
+								: cur.getString(cur.getColumnIndex(Instances.EVENT_LOCATION));
+			} catch (Exception e) {
+				Log.e("AgendaCalendarService", "Probably null value in calendar title/location", e);
+			}
+			if (line1text == null) line1text = "";
+			if (line2text == null) line2text = "";
 			
 			AgendaItem item = new AgendaItem(new AgendaCalendarProvider().getPluginId());
 			item.startTime = new Date(cur.getLong(cur.getColumnIndex(Instances.BEGIN)));
