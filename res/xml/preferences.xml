@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android" >
-    <PreferenceCategory android:title="Plugins" android:key="pref_plugins_category"></PreferenceCategory>
+
+    <PreferenceCategory
+        android:key="pref_plugins_category"
+        android:title="Plugins" >
+    </PreferenceCategory>
     <PreferenceCategory android:title="Header" >
         <CheckBoxPreference
             android:defaultValue="true"
@@ -25,14 +29,44 @@
             android:entryValues="@array/setting_font_size_choice_values"
             android:key="pref_layout_font_size"
             android:title="Font size" />
-        
-        
-        <ListPreference android:key="pref_vibrate_type" android:title="Vibration pattern" android:summary="Plugins may vibrate the watch on data change" android:defaultValue="1" android:entryValues="@array/setting_vibrate_values" android:entries="@array/setting_vibrate_human"/>
-        <CheckBoxPreference android:summaryOff="White cards, black text" android:key="pref_invert_watchface" android:summaryOn="Black cards, white text" android:title="Invert Colors" android:defaultValue="false"/>
-        
-        
-        
-    </PreferenceCategory><PreferenceCategory android:title="Scrolling"><CheckBoxPreference android:summaryOff="Only ever show the topmost events" android:title="Scrolling" android:key="pref_enable_scroll" android:defaultValue="true" android:summaryOn="Flick your wrist to scroll" android:disableDependentsState="false" /><CheckBoxPreference android:dependency="pref_enable_scroll" android:title="Continuous Scrolling" android:key="pref_continuous_scroll" android:summaryOff="Flicking wrist scrolls down a bit" android:summaryOn="Scroll by tilting the watch (activated by wrist flick)" android:defaultValue="false" /><CheckBoxPreference android:dependency="pref_enable_scroll" android:title="Display light while scrolling" android:summaryOff="Light not triggered by scrolling" android:defaultValue="false" android:key="pref_light_while_scrolling" android:summaryOn="Respects backlight settings on watch" /></PreferenceCategory>
+        <ListPreference
+            android:defaultValue="1"
+            android:entries="@array/setting_vibrate_human"
+            android:entryValues="@array/setting_vibrate_values"
+            android:key="pref_vibrate_type"
+            android:summary="Plugins may vibrate the watch on data change"
+            android:title="Vibration pattern" />
+
+        <CheckBoxPreference
+            android:defaultValue="false"
+            android:key="pref_invert_watchface"
+            android:summaryOff="White cards, black text"
+            android:summaryOn="Black cards, white text"
+            android:title="Invert Colors" />
+    </PreferenceCategory>
+    <PreferenceCategory android:title="Scrolling" >
+        <CheckBoxPreference
+            android:defaultValue="true"
+            android:disableDependentsState="false"
+            android:key="pref_enable_scroll"
+            android:summaryOff="Only ever show the topmost events"
+            android:summaryOn="Flick your wrist to scroll"
+            android:title="Scrolling" />
+        <CheckBoxPreference
+            android:defaultValue="false"
+            android:dependency="pref_enable_scroll"
+            android:key="pref_continuous_scroll"
+            android:summaryOff="Flicking wrist scrolls down a bit"
+            android:summaryOn="Scroll by tilting the watch (activated by wrist flick)"
+            android:title="Continuous Scrolling" />
+        <CheckBoxPreference
+            android:defaultValue="false"
+            android:dependency="pref_enable_scroll"
+            android:key="pref_light_while_scrolling"
+            android:summaryOff="Light not triggered by scrolling"
+            android:summaryOn="Respects backlight settings on watch"
+            android:title="Display light while scrolling" />
+    </PreferenceCategory>
     <PreferenceCategory android:title="Time format" >
         <CheckBoxPreference
             android:defaultValue="false"
@@ -61,12 +95,34 @@
             android:summaryOn="Appending am or pm to times"
             android:title="Show am/pm" />
     </PreferenceCategory>
-    
-    <PreferenceScreen android:title="Advanced Settings"><PreferenceCategory android:title="Android app settings">
-        <CheckBoxPreference android:key="pref_notify_on_update" android:summaryOn="Show a notification when a new watchapp version is available" android:defaultValue="true" android:summaryOff="Do not notify me of non-mandatory updates to the watchface" android:title="Notify on update" />
+    <PreferenceCategory android:title="Advanced" >
+        <PreferenceScreen android:title="Advanced Settings" >
+            <PreferenceCategory android:title="Android app settings" >
+                <CheckBoxPreference
+                    android:defaultValue="true"
+                    android:key="pref_notify_on_update"
+                    android:summaryOff="Do not notify me of non-mandatory updates to the watchface"
+                    android:summaryOn="Show a notification when a new watchapp version is available"
+                    android:title="Notify on update" />
+            </PreferenceCategory>
+            <PreferenceCategory android:title="Performance" >
+                <ListPreference
+                    android:defaultValue="10"
+                    android:dialogTitle="Items to synchronize"
+                    android:entries="@array/setting_send_num_items_values"
+                    android:entryValues="@array/setting_send_num_items_values"
+                    android:key="pref_send_num_items"
+                    android:summary="How many items should the watch receive? (decrease if app crashes)"
+                    android:title="Maximal number of items to synchronize" />
+
+                <CheckBoxPreference
+                    android:defaultValue="true"
+                    android:key="pref_limit_persist"
+                    android:summaryOff="Persist all elements (may cause performance issues)"
+                    android:summaryOn="Persist only 5 items (recommended)"
+                    android:title="Limit watch memory usage" />
+            </PreferenceCategory>
+        </PreferenceScreen>
     </PreferenceCategory>
-    <PreferenceCategory android:title="Performance"><ListPreference android:dialogTitle="Items to synchronize" android:entries="@array/setting_send_num_items_values" android:key="pref_send_num_items" android:entryValues="@array/setting_send_num_items_values" android:title="Maximal number of items to synchronize" android:summary="How many items should the watch receive? (decrease if app crashes)" android:defaultValue="10" /><CheckBoxPreference android:summaryOn="Persist only 5 items (recommended)" android:summaryOff="Persist all elements (may cause performance issues)" android:key="pref_limit_persist" android:title="Limit watch memory usage" android:defaultValue="true" /></PreferenceCategory>
-</PreferenceScreen>
-    
 
 </PreferenceScreen>

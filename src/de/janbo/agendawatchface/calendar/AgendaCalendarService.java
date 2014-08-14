@@ -122,7 +122,7 @@ public class AgendaCalendarService extends Service {
 				line1text = line1textCode.equals("0") ? "" 
 								: line1textCode.equals("1") ? cur.getString(cur.getColumnIndex(Instances.TITLE)) 
 								: cur.getString(cur.getColumnIndex(Instances.EVENT_LOCATION));
-			line2text = line2textCode.equals("0") ? "" 
+				line2text = line2textCode.equals("0") ? "" 
 								: line2textCode.equals("1") ? cur.getString(cur.getColumnIndex(Instances.TITLE)) 
 								: cur.getString(cur.getColumnIndex(Instances.EVENT_LOCATION));
 			} catch (Exception e) {
