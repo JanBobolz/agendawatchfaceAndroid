@@ -91,73 +91,75 @@ public class AgendaCalendarService extends Service {
 		cur = cr.query(getContentUri(), new String[] { Instances.CALENDAR_ID, Instances.EVENT_ID, Instances.EVENT_LOCATION, Instances.BEGIN, Instances.END, Instances.TITLE, Instances.ALL_DAY, Instances.SELF_ATTENDEE_STATUS }, selection, selectionArgs,
 				Instances.BEGIN + " ASC");
 
-		long now = Calendar.getInstance().getTimeInMillis();
-		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
-		boolean ignoreAllDayEvents = !prefs.getBoolean("pref_show_all_day_events", true);
-		boolean ignoreDeclinedEvents = !prefs.getBoolean("pref_show_declined_invitations", false);
-		while (cur.moveToNext()) {
-			//Filter all-day-events if set to ignore them
-			if (ignoreAllDayEvents && cur.getInt(cur.getColumnIndex(Instances.ALL_DAY)) != 0)
-				continue;
-			
-			// Filter non-all-day events that have already passed
-			if (cur.getInt(cur.getColumnIndex(Instances.ALL_DAY)) == 0 && cur.getLong(cur.getColumnIndex(Instances.END)) < now)
-				continue;
-			
-			//Filter calendars according to settings
-			if (!prefs.getBoolean("pref_cal_"+cur.getLong(cur.getColumnIndex(Instances.CALENDAR_ID))+"_picked", true))
-				continue;
-			
-			//Filter declined events
-			if (ignoreDeclinedEvents && cur.getInt(cur.getColumnIndex(Instances.SELF_ATTENDEE_STATUS)) == CalendarContract.Attendees.ATTENDEE_STATUS_DECLINED)
-				continue;
-			
-			//Add event to result
-			boolean allday = cur.getInt(cur.getColumnIndex(Instances.ALL_DAY)) != 0;
-			String line1textCode = prefs.getString("pref_layout"+(allday ? "_ad" : "")+"_text_1", allday ? "1" : "1");
-			String line2textCode = prefs.getString("pref_layout"+(allday ? "_ad" : "")+"_text_2", allday ? "2" : "2");
-			String line1text = null;
-			String line2text = null;
-			try {
-				line1text = line1textCode.equals("0") ? "" 
-								: line1textCode.equals("1") ? cur.getString(cur.getColumnIndex(Instances.TITLE)) 
-								: cur.getString(cur.getColumnIndex(Instances.EVENT_LOCATION));
-				line2text = line2textCode.equals("0") ? "" 
-								: line2textCode.equals("1") ? cur.getString(cur.getColumnIndex(Instances.TITLE)) 
-								: cur.getString(cur.getColumnIndex(Instances.EVENT_LOCATION));
-			} catch (Exception e) {
-				Log.e("AgendaCalendarService", "Probably null value in calendar title/location", e);
-			}
-			if (line1text == null) line1text = "";
-			if (line2text == null) line2text = "";
-			
-			AgendaItem item = new AgendaItem(new AgendaCalendarProvider().getPluginId());
-			item.startTime = new Date(cur.getLong(cur.getColumnIndex(Instances.BEGIN)));
-			item.endTime = new Date(cur.getLong(cur.getColumnIndex(Instances.END)));
-			if (cur.getInt(cur.getColumnIndex(Instances.ALL_DAY)) != 0)  //adjust timezone 
-				item.timezone = TimeZone.getTimeZone("UTC");
-			
-			//Line 1
-			item.line1 = new AgendaItem.Line();
-			item.line1.text = line1text;
-			item.line1.textBold = line1textCode.equals("1");
-			item.line1.overflow = (allday && prefs.getBoolean("pref_layout_ad_overflow_row1", true) || !allday && prefs.getBoolean("pref_layout_overflow_row1", true)) ? LineOverflowBehavior.OVERFLOW_IF_NECESSARY : LineOverflowBehavior.NONE;
-			if (allday)
-				item.line1.timeDisplay = TimeDisplayType.NONE;
-			
-			//Line 2
-			if (allday && prefs.getBoolean("pref_layout_ad_show_row2", false) || !allday && prefs.getBoolean("pref_layout_show_row2", true)) {
-				item.line2 = new AgendaItem.Line();
-				item.line2.text = line2text;
-				item.line2.textBold = line2textCode.equals("1");
-				item.line2.overflow = (allday && prefs.getBoolean("pref_layout_ad_overflow_row2", true) || !allday && prefs.getBoolean("pref_layout_overflow_row2", true)) ? LineOverflowBehavior.OVERFLOW_IF_NECESSARY : LineOverflowBehavior.NONE;
+		if (cur != null) {
+			long now = Calendar.getInstance().getTimeInMillis();
+			SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+			boolean ignoreAllDayEvents = !prefs.getBoolean("pref_show_all_day_events", true);
+			boolean ignoreDeclinedEvents = !prefs.getBoolean("pref_show_declined_invitations", false);
+			while (cur.moveToNext()) {
+				//Filter all-day-events if set to ignore them
+				if (ignoreAllDayEvents && cur.getInt(cur.getColumnIndex(Instances.ALL_DAY)) != 0)
+					continue;
+				
+				// Filter non-all-day events that have already passed
+				if (cur.getInt(cur.getColumnIndex(Instances.ALL_DAY)) == 0 && cur.getLong(cur.getColumnIndex(Instances.END)) < now)
+					continue;
+				
+				//Filter calendars according to settings
+				if (!prefs.getBoolean("pref_cal_"+cur.getLong(cur.getColumnIndex(Instances.CALENDAR_ID))+"_picked", true))
+					continue;
+				
+				//Filter declined events
+				if (ignoreDeclinedEvents && cur.getInt(cur.getColumnIndex(Instances.SELF_ATTENDEE_STATUS)) == CalendarContract.Attendees.ATTENDEE_STATUS_DECLINED)
+					continue;
+				
+				//Add event to result
+				boolean allday = cur.getInt(cur.getColumnIndex(Instances.ALL_DAY)) != 0;
+				String line1textCode = prefs.getString("pref_layout"+(allday ? "_ad" : "")+"_text_1", allday ? "1" : "1");
+				String line2textCode = prefs.getString("pref_layout"+(allday ? "_ad" : "")+"_text_2", allday ? "2" : "2");
+				String line1text = null;
+				String line2text = null;
+				try {
+					line1text = line1textCode.equals("0") ? "" 
+									: line1textCode.equals("1") ? cur.getString(cur.getColumnIndex(Instances.TITLE)) 
+									: cur.getString(cur.getColumnIndex(Instances.EVENT_LOCATION));
+					line2text = line2textCode.equals("0") ? "" 
+									: line2textCode.equals("1") ? cur.getString(cur.getColumnIndex(Instances.TITLE)) 
+									: cur.getString(cur.getColumnIndex(Instances.EVENT_LOCATION));
+				} catch (Exception e) {
+					Log.e("AgendaCalendarService", "Probably null value in calendar title/location", e);
+				}
+				if (line1text == null) line1text = "";
+				if (line2text == null) line2text = "";
+				
+				AgendaItem item = new AgendaItem(new AgendaCalendarProvider().getPluginId());
+				item.startTime = new Date(cur.getLong(cur.getColumnIndex(Instances.BEGIN)));
+				item.endTime = new Date(cur.getLong(cur.getColumnIndex(Instances.END)));
+				if (cur.getInt(cur.getColumnIndex(Instances.ALL_DAY)) != 0)  //adjust timezone 
+					item.timezone = TimeZone.getTimeZone("UTC");
+				
+				//Line 1
+				item.line1 = new AgendaItem.Line();
+				item.line1.text = line1text;
+				item.line1.textBold = line1textCode.equals("1");
+				item.line1.overflow = (allday && prefs.getBoolean("pref_layout_ad_overflow_row1", true) || !allday && prefs.getBoolean("pref_layout_overflow_row1", true)) ? LineOverflowBehavior.OVERFLOW_IF_NECESSARY : LineOverflowBehavior.NONE;
 				if (allday)
-					item.line2.timeDisplay = TimeDisplayType.NONE;
+					item.line1.timeDisplay = TimeDisplayType.NONE;
+				
+				//Line 2
+				if (allday && prefs.getBoolean("pref_layout_ad_show_row2", false) || !allday && prefs.getBoolean("pref_layout_show_row2", true)) {
+					item.line2 = new AgendaItem.Line();
+					item.line2.text = line2text;
+					item.line2.textBold = line2textCode.equals("1");
+					item.line2.overflow = (allday && prefs.getBoolean("pref_layout_ad_overflow_row2", true) || !allday && prefs.getBoolean("pref_layout_overflow_row2", true)) ? LineOverflowBehavior.OVERFLOW_IF_NECESSARY : LineOverflowBehavior.NONE;
+					if (allday)
+						item.line2.timeDisplay = TimeDisplayType.NONE;
+				}
+				
+				events.add(item);
 			}
-			
-			events.add(item);
+			cur.close();
 		}
-		cur.close();
 		
 		//Now all events are in the events array, but may be out of order. And too many
 		//Sort
