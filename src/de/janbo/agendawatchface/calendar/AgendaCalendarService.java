@@ -53,7 +53,7 @@ public class AgendaCalendarService extends Service {
 		return START_STICKY;
 	}
 	
-	protected Uri getContentUri() {
+	protected Uri getContentUri(int numberOfDaysFromNow) {
 		Calendar beginTime = Calendar.getInstance();
 		beginTime.add(Calendar.DAY_OF_MONTH, -1);
 		beginTime.set(Calendar.HOUR_OF_DAY, 23);
@@ -63,7 +63,7 @@ public class AgendaCalendarService extends Service {
 		Calendar endTime = Calendar.getInstance();
 		endTime.set(Calendar.HOUR_OF_DAY, 23);
 		endTime.set(Calendar.MINUTE, 59);
-		endTime.add(Calendar.DAY_OF_MONTH, 6);
+		endTime.add(Calendar.DAY_OF_MONTH, numberOfDaysFromNow-1);
 		long endMillis = endTime.getTimeInMillis();
 
 		// Construct the query with the desired date range.
@@ -81,6 +81,9 @@ public class AgendaCalendarService extends Service {
 	 */
 	protected ArrayList<AgendaItem> getEvents(int maxNum) {
 		ArrayList<AgendaItem> events = new ArrayList<AgendaItem>();
+		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+		if (!prefs.getBoolean("pref_key_cal_activate", true))
+			return events;
 		
 		Cursor cur = null;
 		ContentResolver cr = getContentResolver();
@@ -88,12 +91,20 @@ public class AgendaCalendarService extends Service {
 		String[] selectionArgs = null;
 		
 		// Submit the query
-		cur = cr.query(getContentUri(), new String[] { Instances.CALENDAR_ID, Instances.EVENT_ID, Instances.EVENT_LOCATION, Instances.BEGIN, Instances.END, Instances.TITLE, Instances.ALL_DAY, Instances.SELF_ATTENDEE_STATUS }, selection, selectionArgs,
+		int numDaysFromNow = 7;
+		try {
+			numDaysFromNow = Integer.parseInt(prefs.getString("pref_cal_day_range", "7"));
+			if (numDaysFromNow > 1000) //yes, that's lazy but I don't want to deal with people complaining about crashes because they input something horribly large
+				 numDaysFromNow = 1000;
+			if (numDaysFromNow < 1)
+				numDaysFromNow = 1;
+		} catch (NumberFormatException e) {}
+		
+		cur = cr.query(getContentUri(numDaysFromNow), new String[] { Instances.CALENDAR_ID, Instances.EVENT_ID, Instances.EVENT_LOCATION, Instances.BEGIN, Instances.END, Instances.TITLE, Instances.ALL_DAY, Instances.SELF_ATTENDEE_STATUS }, selection, selectionArgs,
 				Instances.BEGIN + " ASC");
 
 		if (cur != null) {
 			long now = Calendar.getInstance().getTimeInMillis();
-			SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
 			boolean ignoreAllDayEvents = !prefs.getBoolean("pref_show_all_day_events", true);
 			boolean ignoreDeclinedEvents = !prefs.getBoolean("pref_show_declined_invitations", false);
 			while (cur.moveToNext()) {

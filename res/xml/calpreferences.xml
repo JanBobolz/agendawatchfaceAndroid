@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android" >
-	<PreferenceCategory android:title="Filtering"><PreferenceScreen android:key="pref_screen_cal_pick" android:persistent="false" android:summary="Choose which calendars to display" android:title="Pick calendars">
-    </PreferenceScreen><CheckBoxPreference android:defaultValue="true" android:key="pref_show_all_day_events" android:summaryOff="Hiding all-day events" android:summaryOn="Showing all-day events" android:title="Show all-day events" android:disableDependentsState="false" />
-    <CheckBoxPreference android:title="Show declined invitations" android:summaryOff="Hiding events that you declined" android:key="pref_show_declined_invitations" android:summaryOn="Showing events that you declined" android:defaultValue="false"/>
+	<CheckBoxPreference android:summaryOff="Calendar Events disabled" android:title="Show Calendar Events" android:key="pref_key_cal_activate" android:defaultValue="true" android:summaryOn="Showing Calendar Events" android:disableDependentsState="false"/><PreferenceCategory android:title="Filtering"><PreferenceScreen android:key="pref_screen_cal_pick" android:persistent="false" android:summary="Choose which calendars to display" android:title="Pick calendars" android:dependency="pref_key_cal_activate">
+		
+    </PreferenceScreen><EditTextPreference android:key="pref_cal_day_range" android:title="Number of Days displayed" android:summary="How many days should be shown at most?" android:dependency="pref_key_cal_activate" android:defaultValue="7"/><CheckBoxPreference android:defaultValue="true" android:key="pref_show_all_day_events" android:summaryOff="Hiding all-day events" android:summaryOn="Showing all-day events" android:title="Show all-day events" android:disableDependentsState="false" android:dependency="pref_key_cal_activate"/>
+    <CheckBoxPreference android:title="Show declined invitations" android:summaryOff="Hiding events that you declined" android:key="pref_show_declined_invitations" android:summaryOn="Showing events that you declined" android:defaultValue="false" android:dependency="pref_key_cal_activate"/>
 </PreferenceCategory>
-    <PreferenceCategory android:title="Layout"><PreferenceScreen android:key="pref_screen_event_layout" android:title="Regular event layout">
+    <PreferenceCategory android:title="Layout"><PreferenceScreen android:key="pref_screen_event_layout" android:title="Regular event layout" android:dependency="pref_key_cal_activate">
         <PreferenceCategory android:title="First line">
             <ListPreference android:defaultValue="0" android:entries="@array/setting_time_choice_human" android:entryValues="@array/setting_time_choice_values" android:key="pref_layout_time_1" android:summary="Choose what time to display" android:title="Time to show" />
             <ListPreference android:defaultValue="1" android:entries="@array/setting_text_choice_human" android:entryValues="@array/setting_text_choice_values" android:key="pref_layout_text_1" android:summary="Choose what text to display" android:title="Text to show" />
@@ -17,7 +18,7 @@
             <ListPreference android:defaultValue="2" android:dependency="pref_layout_show_row2" android:entries="@array/setting_text_choice_human" android:entryValues="@array/setting_text_choice_values" android:key="pref_layout_text_2" android:summary="Choose what text to display" android:title="Text to show" />
             <CheckBoxPreference android:key="pref_layout_overflow_row2" android:title="Allow longer texts" android:summaryOn="Long texts may increase the line's height" android:summaryOff="Line's height is always the same" android:defaultValue="true" android:dependency="pref_layout_show_row2" />
         </PreferenceCategory>
-    </PreferenceScreen><PreferenceScreen android:key="pref_screen_allday_event_layout" android:title="All-day event layout" android:dependency="pref_show_all_day_events">
+    </PreferenceScreen><PreferenceScreen android:key="pref_screen_allday_event_layout" android:title="All-day event layout" android:dependency="pref_key_cal_activate">
         <PreferenceCategory android:title="First line">
             <ListPreference android:defaultValue="1" android:entries="@array/setting_text_choice_human" android:entryValues="@array/setting_text_choice_values" android:key="pref_layout_ad_text_1" android:summary="Choose what text to display" android:title="Text to show" />
             <CheckBoxPreference android:defaultValue="true" android:key="pref_layout_ad_overflow_row1" android:summaryOn="Long texts may increase the line's height" android:summaryOff="Line's height is always the same" android:title="Allow longer texts" />
@@ -29,6 +30,7 @@
             <CheckBoxPreference android:title="Allow longer texts" android:key="pref_layout_ad_overflow_row2" android:summaryOn="Long texts may increase the line's height" android:summaryOff="Line's height is always the same" android:dependency="pref_layout_ad_show_row2" />
         </PreferenceCategory>
     </PreferenceScreen></PreferenceCategory>
+    
     
     
     
