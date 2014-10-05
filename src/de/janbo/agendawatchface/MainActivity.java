@@ -1,12 +1,16 @@
 package de.janbo.agendawatchface;
 
-import android.net.Uri;
-import android.os.Bundle;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
+import android.net.Uri;
+import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.text.format.DateUtils;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -42,8 +46,9 @@ public class MainActivity extends Activity {
 				installButton.setOnClickListener(new OnClickListener() {
 					@Override
 					public void onClick(View v) {
-						if (version == -1 || version <= AgendaWatchfaceService.CURRENT_WATCHAPP_VERSION_BUNDLED) //send app to watch
-							WatchappHandler.install(MainActivity.this);
+						if (version == -1 || version <= AgendaWatchfaceService.CURRENT_WATCHAPP_VERSION_BUNDLED) { //send app to watch
+							installWatchface();
+						}
 						else { //offer updating this app
 							Intent intent;
 							try {
@@ -94,12 +99,35 @@ public class MainActivity extends Activity {
 		getMenuInflater().inflate(R.menu.main, menu);
 		return true;
 	}
+	
+	private void installWatchface() {
+		final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+		
+		if (prefs.getInt("tried_install_version", 0) == AgendaWatchfaceService.CURRENT_WATCHAPP_VERSION_BUNDLED) {
+			AlertDialog.Builder builder = new AlertDialog.Builder(this);
+			
+			builder.setMessage("If installation fails, please install the latest Pebble firmware!")
+				.setTitle("Install Pebble Watchface")
+				.setPositiveButton("Okay", new DialogInterface.OnClickListener() {
+					@Override
+					public void onClick(DialogInterface dialog, int which) {
+						WatchappHandler.install(MainActivity.this);
+					}
+				});
+	
+			AlertDialog dialog = builder.create();
+			dialog.show();
+		} else {
+			prefs.edit().putInt("tried_install_version", AgendaWatchfaceService.CURRENT_WATCHAPP_VERSION_BUNDLED).commit();
+			WatchappHandler.install(MainActivity.this);
+		}
+	}
 
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item) {
 		switch (item.getItemId()) {
 		case R.id.action_install_watchapp:
-			WatchappHandler.install(this);
+			installWatchface();
 			return true;
 		case R.id.action_settings:
 			startActivity(new Intent(this, SettingsActivity.class));

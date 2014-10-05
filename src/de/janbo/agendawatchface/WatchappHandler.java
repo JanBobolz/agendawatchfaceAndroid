@@ -39,7 +39,6 @@ public class WatchappHandler {
 
 			myOutput.close();
 			myInput.close();
-
 		} catch (IOException e) {
 			e.printStackTrace();
 			return;
@@ -49,7 +48,6 @@ public class WatchappHandler {
 		intent.setDataAndType(Uri.fromFile(watchappFile), "application/octet-stream");
 		try {
 			context.startActivity(intent);
-
 		} catch (ActivityNotFoundException e) {
 			AlertDialog.Builder builder = new AlertDialog.Builder(context);
 			builder.setMessage("Watchapp installation has failed. Do you have Pebble app installed?").setNegativeButton("OK", null).show();
