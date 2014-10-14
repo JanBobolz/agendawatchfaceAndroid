@@ -76,12 +76,6 @@
             android:title="Show date on weekday separators" />
         <CheckBoxPreference
             android:defaultValue="false"
-            android:key="pref_layout_countdown"
-            android:summaryOff="Always show the time, never a countdown"
-            android:summaryOn="Show countdowns (e.g., &quot;45min&quot;) if time is close"
-            android:title="Countdowns" />
-        <CheckBoxPreference
-            android:defaultValue="false"
             android:disableDependentsState="false"
             android:key="pref_12h"
             android:summaryOff="Showing times in 24h format"
